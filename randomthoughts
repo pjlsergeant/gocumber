@@ -1,0 +1,36 @@
+
+
+OK, so the core of this is...
+
+    Lose the formatter idea, something instead just needs to
+    own/instantiate/whatever a T object, then it needs to
+    load the features, all that jazz, and pass through the
+    t object
+
+
+
+
+
+
+
+Loading phase:
+    Load the feature files, giving back a feature model
+    Instatiate a step definition loader and matcher
+
+Running the tests:
+    Instatiate a step dispatcher, which requires
+
+    Step dispatcher requires:
+        + The feature model
+        + A step matcher
+        + A step execution environment
+
+        It instantiates a Test Status object
+
+        Then for each feature, scenario, step
+            Get the step from the step matcher
+            StepExecutor->execute( StepCode, TestStatusObject, StepModel )
+            Dispatch the result to the formatter
+
+            Execute the step with the Test Status Object, and Step Execution Environment
+
