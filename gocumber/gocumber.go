@@ -11,6 +11,7 @@ type TableData struct {
 }
 
 type Step struct {
+	Scenario     *Scenario
 	Text         string
 	StartsAt     DocumentLocation
 	Verb         string
@@ -20,6 +21,7 @@ type Step struct {
 }
 
 type Scenario struct {
+	Feature    *Feature
 	Name       string
 	StartsAt   DocumentLocation
 	Tags       []string
