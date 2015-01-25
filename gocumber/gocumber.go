@@ -5,13 +5,28 @@ type DocumentLocation struct {
 	Line     int
 }
 
+type TableData struct {
+	Columns []string
+	Data    []map[string]string
+}
+
+type Step struct {
+	Text         string
+	StartsAt     DocumentLocation
+	Verb         string
+	OriginalVerb string
+	TableData    *TableData
+	DocString    string
+}
+
 type Scenario struct {
 	Name       string
 	StartsAt   DocumentLocation
 	Tags       []string
 	Background bool
-	Steps      []string
-	Data       map[string]string
+	Steps      []Step
+	TableData  *TableData
+	DocString  string
 }
 
 type Feature struct {
@@ -20,6 +35,6 @@ type Feature struct {
 	ConditionsOfSatisfaction []string
 	Tags                     []string
 	Language                 string
-	Background               Scenario
+	Background               *Scenario
 	Scenario                 []Scenario
 }
