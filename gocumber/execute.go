@@ -1,7 +1,13 @@
 package gocumber
 
-import "fmt"
 import "testing"
+import "fmt"
+
+const (
+	passed = iota
+	pending
+	failed
+)
 
 type Executor struct {
 	StepMatcher StepMatcher
@@ -10,33 +16,63 @@ type Executor struct {
 	T           *testing.T
 }
 
-func (e *Executor) RunStep(s Step) {
+func (e *Executor) RunScenario(sc Scenario) {
 
 	// Check we already have a stash
 	if e.Stash == nil {
 		e.Stash = make(map[string]interface{})
 	}
 
+	scenarioStatus := passed
+	shortCircuit := false
+
+	for _, step := range sc.Steps {
+		stepStatus := e.RunStep(step, shortCircuit)
+
+		fmt.Printf("Step [%s] returning %i\n", step.Text, stepStatus)
+
+		if scenarioStatus == passed {
+			if stepStatus == pending {
+				scenarioStatus = pending
+				shortCircuit = true
+			}
+
+			if stepStatus == failed {
+				scenarioStatus = failed
+				shortCircuit = true
+			}
+		}
+	}
+}
+
+func (e Executor) RunStep(s Step, skip bool) int {
+
+	// New testing context
+	t := testing.T{}
+
 	// Build the step context
 	sc := StepContext{
 		Stash: e.Stash,
 		Step:  s,
-		T:     e.T,
+		T:     &t,
 	}
 
 	// Can we find a matching step definition
 	sd := e.StepMatcher.Match(&sc)
 
+	status := passed
+
 	if sd != nil {
-		fmt.Println("Executing for %s", s.Text)
+		t.Logf("Executing for %s", s.Text)
 		sd(sc)
-		if e.T.Failed() {
-			fmt.Println("\tThat failed")
+		if t.Failed() {
+			status = failed
 		} else {
-			fmt.Println("\tThat passed")
+			status = passed
 		}
 	} else {
-		fmt.Println("No match found for %s", s.Text)
+		status = pending
 	}
 
+	return status
 }

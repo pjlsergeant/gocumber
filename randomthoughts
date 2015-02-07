@@ -2,8 +2,8 @@
 
 
 Todo:
-    - Execute Scenario (with data steps)
-    - Execute Feature (with background)
+    - Execute a Scenario
+    - Execute Feature (with background, expanded data steps)
     - Keep track of pass, fail, skip, and skip appropriately
     - Write a simple text formatter
     - Write a data formatter
