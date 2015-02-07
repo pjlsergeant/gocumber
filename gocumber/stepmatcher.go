@@ -1,6 +1,7 @@
 package gocumber
 
 import "regexp"
+import "testing"
 
 // So basically a step matcher needs to take a StepContext,
 // and it needs to return it with the matches populated...
@@ -24,7 +25,8 @@ type StepContext struct {
 	Stash         map[string]interface{}
 	Matches       []string
 	MatchIndicies []int
-	Step          *Step
+	Step          Step
+	T             *testing.T
 }
 
 func (m *StepMatcher) Add(verb string, regexStr string, body func(StepContext)) {
@@ -59,14 +61,14 @@ func (m StepMatcher) Match(c *StepContext) (f func(StepContext)) {
 	case "Then":
 		stepJar = &m.Then
 	default:
-		panic("Somehow your verb isn't Given/When/Then, it's " + (*c).Step.Verb)
+		panic("Somehow your verb isn't Given/When/Then, it's " + c.Step.Verb)
 	}
 
 	for _, jar := range []*[]StepDefinition{stepJar, &m.Any} {
 		for _, definition := range *jar {
 
 			// Do we match at all?
-			matches := definition.Regexp.FindStringSubmatchIndex((*c).Step.Text)
+			matches := definition.Regexp.FindStringSubmatchIndex(c.Step.Text)
 
 			// If not, on to the next!
 			if matches == nil {
@@ -79,7 +81,7 @@ func (m StepMatcher) Match(c *StepContext) (f func(StepContext)) {
 			// If you were expecting this code to be performant, and not geared
 			// to programmer laziness, you missed the fact that this is a Ruby
 			// tool :-P
-			matchStrings := definition.Regexp.FindStringSubmatch((*c).Step.Text)
+			matchStrings := definition.Regexp.FindStringSubmatch(c.Step.Text)
 			(*c).Matches = matchStrings
 
 			f = definition.Body

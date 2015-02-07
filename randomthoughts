@@ -1,5 +1,19 @@
 
 
+
+Todo:
+    - Execute Scenario (with data steps)
+    - Execute Feature (with background)
+    - Keep track of pass, fail, skip, and skip appropriately
+    - Write a simple text formatter
+    - Write a data formatter
+    - Integrate the ragel parser
+    - Write a command-line tool
+    - Get a code review
+
+
+-------
+
 OK, so the core of this is...
 
     Lose the formatter idea, something instead just needs to
