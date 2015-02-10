@@ -1,5 +1,10 @@
 package gocumber
 
+// USEFUL URLs:
+//    https://github.com/bnoordhuis/ragel/blob/master/examples/go/url.rl
+//    http://thingsaaronmade.com/blog/a-simple-intro-to-writing-a-lexer-with-ragel.html
+//    https://raw.githubusercontent.com/cucumber/gherkin/master/ragel/lexer.java.rl.erb
+
   %%{
     machine lexer;
     alphtype byte;
