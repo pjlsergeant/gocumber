@@ -7,7 +7,7 @@
   I18N_ScenarioOutline = ('Scenario Outline:') >start_keyword %end_keyword;
   I18N_Scenario = ('Scenario:') >start_keyword %end_keyword;
   I18N_Step = ('Given' | 'When' | 'Then' | 'And' ) >start_keyword %end_keyword;
-  I18N_Examples = ('Example:') >start_keyword %end_keyword;
+  I18N_Examples = ('Examples:') >start_keyword %end_keyword;
 
   EOF = '%_FEATURE_END_%'; # Explicit EOF added before scanning begins
   EOL = ('\n' | '\r\n') @inc_line_number @last_newline;

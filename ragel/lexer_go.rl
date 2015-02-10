@@ -1,5 +1,8 @@
 package gocumber
 
+import "fmt"
+import "strings"
+
 // USEFUL URLs:
 //    https://github.com/bnoordhuis/ragel/blob/master/examples/go/url.rl
 //    http://thingsaaronmade.com/blog/a-simple-intro-to-writing-a-lexer-with-ragel.html
@@ -10,28 +13,29 @@ package gocumber
     alphtype byte;
 
     action begin_content {
-      // contentStart = p;
-      // currentLine = lineNumber;
-      // if(keyword != null) {
-      //   startCol = p - lastNewline - (keyword.length() + 1);
-      // }
+      contentStart = p
+      currentLine = lineNumber
+
+      if(len(keyword) != 0) {
+        startCol = p - lastNewline - (len(keyword) + 1);
+      }
     }
 
     action start_docstring {
-      // currentLine = lineNumber;
-      // startCol = p - lastNewline;
+      currentLine = lineNumber
+      startCol = p - lastNewline
     }
 
     action begin_docstring_content {
-      // contentStart = p;
+      contentStart = p
     }
 
     action start_docstring_content_type {
-      // docstringContentTypeStart = p;
+      docstringContentTypeStart = p
     }
 
     action end_docstring_content_type {
-      // docstringContentTypeEnd = p;
+      docstringContentTypeEnd = p
     }
 
     action store_docstring_content {
@@ -43,36 +47,36 @@ package gocumber
     action store_feature_content {
       // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
       // listener.feature(keyword, nameDescription[0], nameDescription[1], currentLine);
-      // if(nextKeywordStart != -1) p = nextKeywordStart - 1;
-      // nextKeywordStart = -1;
+      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+      nextKeywordStart = -1
     }
 
     action store_background_content {
       // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
       // listener.background(keyword, nameDescription[0], nameDescription[1], currentLine);
-      // if(nextKeywordStart != -1) p = nextKeywordStart - 1;
-      // nextKeywordStart = -1;
+      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+      nextKeywordStart = -1
     }
 
     action store_scenario_content {
       // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
       // listener.scenario(keyword, nameDescription[0], nameDescription[1], currentLine);
-      // if(nextKeywordStart != -1) p = nextKeywordStart - 1;
-      // nextKeywordStart = -1;
+      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+      nextKeywordStart = -1
     }
 
     action store_scenario_outline_content {
       // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
       // listener.scenarioOutline(keyword, nameDescription[0], nameDescription[1], currentLine);
-      // if(nextKeywordStart != -1) p = nextKeywordStart - 1;
-      // nextKeywordStart = -1;
+      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+      nextKeywordStart = -1
     }
 
     action store_examples_content {
       // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
       // listener.examples(keyword, nameDescription[0], nameDescription[1], currentLine);
-      // if(nextKeywordStart != -1) p = nextKeywordStart - 1;
-      // nextKeywordStart = -1;
+      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+      nextKeywordStart = -1
     }
 
     action store_step_content {
@@ -81,43 +85,45 @@ package gocumber
 
     action store_comment_content {
       // listener.comment(substring(data, contentStart, p).trim(), lineNumber);
-      // keywordStart = -1;
+      keywordStart = -1
     }
 
     action store_tag_content {
       // listener.tag(substring(data, contentStart, p).trim(), currentLine);
-      // keywordStart = -1;
+      keywordStart = -1
     }
 
     action inc_line_number {
-      // lineNumber++;
+      lineNumber++;
     }
 
     action last_newline {
-      // lastNewline = p + 1;
+      lastNewline = p + 1
     }
 
     action start_keyword {
-      // if(keywordStart == -1) keywordStart = p;
+      if (keywordStart == -1) { keywordStart = p }
     }
 
     action end_keyword {
-      // keyword = substring(data, keywordStart, p).replaceFirst(":$","");
-      // keywordStart = -1;
+      rawKeyword := string(data[keywordStart:p])
+      rawKeyword = strings.Replace(rawKeyword, ":", "", 1)
+      keyword = rawKeyword[0:]
+      keywordStart = -1
     }
 
     action next_keyword_start {
-      // nextKeywordStart = p;
+      nextKeywordStart = p
     }
 
     action start_row {
-    //   p = p - 1;
-    //   currentRow = new ArrayList<String>();
-    //   currentLine = lineNumber;
+      p = p - 1
+      currentRow = currentRow[:0]
+      currentLine = lineNumber
     }
 
     action begin_cell_content {
-      // contentStart = p;
+      contentStart = p;
     }
 
     action store_cell_content {
@@ -134,9 +140,16 @@ package gocumber
     }
 
     action end_feature {
-      // if(cs < lexer_first_final) {
-      //   String content = currentLineContent(data, lastNewline);
-      //   throw new LexingError("Lexing error on line " + lineNumber + ": '" + content + "'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.");
+      if(cs < lexer_first_final) {
+          content := currentLineContent( data, lastNewline )
+          panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
+          // Silence warnings about these being unused...
+          panic( currentLine )
+          panic(contentStart)
+          panic(docstringContentTypeStart)
+          panic(docstringContentTypeEnd)
+          panic(startCol)
+      }
       // } else {
       //   listener.eof();
       // }
@@ -149,32 +162,37 @@ package gocumber
   %% write data noerror;
   // END: write data noerror;
 
+func currentLineContent(data []byte, lastNewline int) (string) {
+    current := string(data[lastNewline:])
+    return strings.TrimSpace( current )
+}
+
+
+
 func ParseFeature(data []byte) (feature Feature, err error) {
-  cs, p, pe, eof := 0, 0, len(data), len(data)
 
-  // public void scan(String source)  {
-  //   String input = source + "\n%_FEATURE_END_%";
-  //   byte[] data = null;
-  //   try {
-  //     data = input.getBytes("UTF-8");
-  //   } catch(UnsupportedEncodingException e) {
-  //     throw new RuntimeException(e);
-  //   }
-  //   int cs, p = 0, pe = data.length;
-  //   int eof = pe;
+  // Original ragel parser assumes this will be there, who am I to argue?
+  data = append(data, []byte("%_FEATURE_END_%")...)
 
-  //   int lineNumber = 1;
-  //   int lastNewline = 0;
+  cs := 0 // No idea what this is
+  p := 0 // Position?
+  pe := len(data) // No idea
+  eof := len(data) // Location of EOF
 
-  //   int contentStart = -1;
-  //   int currentLine = -1;
-  //   int docstringContentTypeStart = -1;
-  //   int docstringContentTypeEnd = -1;
-  //   int startCol = -1;
-  //   int nextKeywordStart = -1;
-  //   int keywordStart = -1;
-  //   String keyword = null;
-  //   List<String> currentRow = null;
+  lineNumber := 1
+  lastNewline := 0
+
+  contentStart := -1
+  currentLine := -1
+
+  docstringContentTypeStart := -1
+  docstringContentTypeEnd := -1
+  startCol := -1;
+  nextKeywordStart := -1
+  keywordStart := -1
+
+  var keyword string
+  var currentRow []string
 
   // START: write init
     %% write init;
