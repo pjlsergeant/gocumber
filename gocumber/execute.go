@@ -16,7 +16,7 @@ type Executor struct {
 	T           *testing.T
 }
 
-func (e *Executor) RunScenario(sc Scenario) {
+func (e *Executor) RunScenario(sc Scenario) int {
 
 	// Check we already have a stash
 	if e.Stash == nil {
@@ -43,6 +43,8 @@ func (e *Executor) RunScenario(sc Scenario) {
 			}
 		}
 	}
+
+	return scenarioStatus
 }
 
 func (e Executor) RunStep(s Step, skip bool) int {
