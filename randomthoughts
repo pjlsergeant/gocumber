@@ -3,6 +3,11 @@
 
 Todo:
     + Execute a Scenario
+    - You've left the parser half-done
+        - It doesn't add steps properly
+        - It doesn't save a step's table properly
+        - makeTable is a no-op
+
     - Add a first text harness
     - Implement the short-circuiting properly
     - Execute Feature (with background, expanded data steps)
