@@ -2,7 +2,11 @@ package examples
 
 import g "github.com/sheriff/gocumber/gocumber"
 import d "github.com/sheriff/gocumber/gocumber/langs"
+
+//import "crypto"
+import "hash"
 import "crypto/md5"
+import "encoding/base64"
 import "encoding/hex"
 
 import (
@@ -10,28 +14,27 @@ import (
 )
 
 func init() {
+
+	var hash_object hash.Hash
+
 	d.Given("a Digest (.+) object", func(s g.StepContext) {
 		switch s.Matches[1] {
 		case "MD5":
-			s.Stash["hash_object"] = md5.New()
+			hash_object = md5.New()
 		default:
 			panic("Don't know about hash type: " + s.Matches[1])
 		}
 	})
 
 	d.When("I've added \"(.+)\" to the object", func(s g.StepContext) {
-		if s.Stash["hash_input"] == nil {
-			s.Stash["hash_input"] = ""
-		}
-		s.Stash["hash_input"] = s.Stash["hash_input"].(string) + s.Matches[1]
+		hash_object.Write([]byte(s.Matches[1]))
 	})
 
 	d.Then("the hex output is \"(.+)\"", func(s g.StepContext) {
-		hash_array := md5.Sum([]byte(s.Stash["hash_input"].(string)))
-		hash_slice := hash_array[0:]
+		assert.Equal(s.T, s.Matches[1], hex.EncodeToString(hash_object.Sum(nil)), "Matches!")
+	})
 
-		// hashed
-		hash_hex := hex.EncodeToString(hash_slice)
-		assert.Equal(s.T, hash_hex, s.Matches[1], "Matches!")
+	d.Then("the base64 output is \"(.+)\"", func(s g.StepContext) {
+		assert.Equal(s.T, s.Matches[1], base64.StdEncoding.EncodeToString(hash_object.Sum(nil)), "Matches!")
 	})
 }
