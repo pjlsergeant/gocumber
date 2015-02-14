@@ -13,7 +13,7 @@ import "strconv"
 //    https://raw.githubusercontent.com/cucumber/gherkin/master/ragel/lexer.java.rl.erb
 
   
-//line ragel/lexer_go.rl:190
+//line ragel/lexer_go.rl:255
 
 
   // START: write data noerror;
@@ -572,7 +572,7 @@ const lexer_first_final int = 292
 const lexer_en_main int = 1
 
 
-//line ragel/lexer_go.rl:194
+//line ragel/lexer_go.rl:259
   // END: write data noerror;
 
 func currentLineContent(data []byte, lastNewline int) (string) {
@@ -581,7 +581,6 @@ func currentLineContent(data []byte, lastNewline int) (string) {
 }
 
 func unindent(startCol int, text []byte) (string) {
-
     regex, err := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
 
     if ( err != nil ) {
@@ -601,7 +600,7 @@ func keywordContent( data []byte, p int, eof int, nextKeywordStart int, contentS
 }
 
 
-func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, string) {
+func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, []string) {
     text := unindent( startCol, textBytes )
     text = strings.TrimSpace( text )
     lines := strings.Split(text, "\n")
@@ -611,15 +610,19 @@ func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, strin
       }
 
     if ( len(lines) == 0 ) {
-      return "", ""
+      return "", []string{}
     } else if ( len(lines) == 1 ) {
-      return lines[0],""
+      return lines[0], []string{}
       } else {
-        return lines[0], strings.Join(lines[1:], "\n")
+        return lines[0], lines[1:]
       }
 }
 
-func ParseFeature(data []byte) (feature Feature, err error) {
+func makeTable(rows [][]string) (*TableData) {
+    return &TableData{}
+}
+
+func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 
   // Original ragel parser assumes this will be there, who am I to argue?
   data = append(data, []byte("%_FEATURE_END_%")...)
@@ -642,21 +645,28 @@ func ParseFeature(data []byte) (feature Feature, err error) {
   keywordStart := -1
 
   var keyword string
+  var currentTable [][]string
   var currentRow []string
+
+  var tags []string
+//  var lastScenario *Scenario = nil;
+//  var lastStep *Step = nil;
+
+  var examplesTable bool = false;
 
   // START: write init
     
-//line gocumber/parser.go:650
+//line gocumber/parser.go:660
 	{
 	cs = lexer_start
 	}
 
-//line ragel/lexer_go.rl:267
+//line ragel/lexer_go.rl:342
   // END: write init
 
   // START: write exec
     
-//line gocumber/parser.go:660
+//line gocumber/parser.go:670
 	{
 	var _klen int
 	var _trans int
@@ -783,102 +793,172 @@ _match:
 		case 6:
 //line ragel/lexer_go.rl:57
 
-      kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        name, description := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Feature]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.feature(keyword, nameDescription[0], nameDescription[1], currentLine);
+        feature = Feature{
+            Name: name,
+            StartsAt: DocumentLocation{ Filename: filename, Line: currentLine },
+            ConditionsOfSatisfaction: description,
+            Tags: tags,
+            Language: "en",
+            Background: nil,
+            Scenario: []Scenario{},
+        }
 
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        tags = tags[:0]
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     
 		case 7:
-//line ragel/lexer_go.rl:68
+//line ragel/lexer_go.rl:77
 
-      kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Background]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.background(keyword, nameDescription[0], nameDescription[1], currentLine);
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        background := Scenario{
+            Feature:    &feature,
+            Name:       name,
+            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+            Tags:       tags,
+            Background: true,
+            Steps:      []Step{},
+            TableData:  nil,
+        }
+
+        //lastScenario = &background
+        tags = tags[:0]
+
+        if ( examplesTable ) {
+            background.TableData = makeTable(currentTable)
+            currentTable = currentTable[:0]
+            examplesTable = false
+        }
+
+        feature.Background = &background
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     
 		case 8:
-//line ragel/lexer_go.rl:78
+//line ragel/lexer_go.rl:106
 
-            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Scenario]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.scenario(keyword, nameDescription[0], nameDescription[1], currentLine);
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        scenario := Scenario{
+            Feature:    &feature,
+            Name:       name,
+            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+            Tags:       tags,
+            Background: false,
+            Steps:      []Step{},
+            TableData:  nil,
+        }
+
+        //lastScenario = &scenario
+        tags = tags[:0]
+
+        if ( examplesTable ) {
+            scenario.TableData = makeTable(currentTable)
+            currentTable = currentTable[:0]
+            examplesTable = false
+        }
+
+        feature.Scenario = append( feature.Scenario, scenario )
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     
 		case 9:
-//line ragel/lexer_go.rl:88
+//line ragel/lexer_go.rl:135
 
-            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Scenario Outline]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.scenarioOutline(keyword, nameDescription[0], nameDescription[1], currentLine);
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        scenario := Scenario{
+            Feature:    &feature,
+            Name:       name,
+            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+            Tags:       tags,
+            Background: false,
+            Steps:      []Step{},
+            TableData:  nil,
+        }
+
+        //lastScenario = &scenario
+        tags = tags[:0]
+
+        if ( examplesTable ) {
+            scenario.TableData = makeTable(currentTable)
+            currentTable = currentTable[:0]
+            examplesTable = false
+        }
+
+        feature.Scenario = append( feature.Scenario, scenario )
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     
 		case 10:
-//line ragel/lexer_go.rl:98
+//line ragel/lexer_go.rl:164
 
-            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        //kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        //name, description := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Examples]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.examples(keyword, nameDescription[0], nameDescription[1], currentLine);
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        examplesTable = true;
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     
 		case 11:
-//line ragel/lexer_go.rl:108
+//line ragel/lexer_go.rl:174
 
         con := string( data[contentStart:p] )
         con = strings.TrimSpace( con )
         fmt.Printf("Store Thing: [Step]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
       // listener.step(keyword, substring(data, contentStart, p).trim(), currentLine);
+
     
 		case 12:
-//line ragel/lexer_go.rl:115
+//line ragel/lexer_go.rl:182
 
         con := string( data[contentStart:p] )
         con = strings.TrimSpace( con )
-        fmt.Printf("Store Thing: [Comment]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
-      // listener.comment(substring(data, contentStart, p).trim(), lineNumber);
-      keywordStart = -1
+        // Discard comments
+        // fmt.Printf("Store Thing: [Comment]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
+        // listener.comment(substring(data, contentStart, p).trim(), lineNumber);
+        keywordStart = -1
     
 		case 13:
-//line ragel/lexer_go.rl:123
+//line ragel/lexer_go.rl:191
 
-              con := string( data[contentStart:p] )
+        con := string( data[contentStart:p] )
         con = strings.TrimSpace( con )
-        fmt.Printf("Store Thing: [Tag]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
-      // listener.tag(substring(data, contentStart, p).trim(), currentLine);
-      keywordStart = -1
+        con = strings.TrimLeft( con, "@" ) // Don't need the @
+
+        tags = append( tags, con )
+
+        keywordStart = -1
     
 		case 14:
-//line ragel/lexer_go.rl:131
+//line ragel/lexer_go.rl:201
 
       lineNumber++;
     
 		case 15:
-//line ragel/lexer_go.rl:135
+//line ragel/lexer_go.rl:205
 
       lastNewline = p + 1
     
 		case 16:
-//line ragel/lexer_go.rl:139
+//line ragel/lexer_go.rl:209
 
       if (keywordStart == -1) { keywordStart = p }
     
 		case 17:
-//line ragel/lexer_go.rl:143
+//line ragel/lexer_go.rl:213
 
       rawKeyword := string(data[keywordStart:p])
       rawKeyword = strings.Replace(rawKeyword, ":", "", 1)
@@ -886,51 +966,46 @@ _match:
       keywordStart = -1
     
 		case 18:
-//line ragel/lexer_go.rl:150
+//line ragel/lexer_go.rl:220
 
       nextKeywordStart = p
     
 		case 19:
-//line ragel/lexer_go.rl:154
+//line ragel/lexer_go.rl:224
 
       p = p - 1
       currentRow = currentRow[:0]
       currentLine = lineNumber
     
 		case 20:
-//line ragel/lexer_go.rl:160
+//line ragel/lexer_go.rl:230
 
       contentStart = p;
     
 		case 21:
-//line ragel/lexer_go.rl:164
+//line ragel/lexer_go.rl:234
 
-      con := string(data[contentStart:p])
-      con = strings.TrimSpace(con)
-      con = strings.Replace(con, "\\|", "|", -1)
-      con = strings.Replace(con, "\\n", "\n", -1)
-      con = strings.Replace(con, "\\\\", "\\", -1)
-      // fmt.Printf("store_cell_conent: [%s]\n", con)
-      currentRow = append( currentRow, con )
+        con := string(data[contentStart:p])
+        con = strings.TrimSpace(con)
+        con = strings.Replace(con, "\\|", "|", -1)
+        con = strings.Replace(con, "\\n", "\n", -1)
+        con = strings.Replace(con, "\\\\", "\\", -1)
+        currentRow = append( currentRow, con )
     
 		case 22:
-//line ragel/lexer_go.rl:174
+//line ragel/lexer_go.rl:243
 
-      fmt.Printf("store_row: [%s] [%s]\n", currentRow, currentLine )
-      // listener.row(currentRow, currentLine);
+        currentTable = append( currentTable, currentRow )
     
 		case 23:
-//line ragel/lexer_go.rl:179
+//line ragel/lexer_go.rl:247
 
       if(cs < lexer_first_final) {
           content := currentLineContent( data, lastNewline )
           panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
-      } else {
-        fmt.Printf("EOF\n")
-         // listener.eof();
       }
     
-//line gocumber/parser.go:934
+//line gocumber/parser.go:1009
 		}
 	}
 
@@ -950,17 +1025,14 @@ _again:
 			__acts++
 			switch _lexer_actions[__acts-1] {
 			case 23:
-//line ragel/lexer_go.rl:179
+//line ragel/lexer_go.rl:247
 
       if(cs < lexer_first_final) {
           content := currentLineContent( data, lastNewline )
           panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
-      } else {
-        fmt.Printf("EOF\n")
-         // listener.eof();
       }
     
-//line gocumber/parser.go:964
+//line gocumber/parser.go:1036
 			}
 		}
 	}
@@ -968,9 +1040,9 @@ _again:
 	_out: {}
 	}
 
-//line ragel/lexer_go.rl:271
+//line ragel/lexer_go.rl:346
   // END: write init
 
 
-    return Feature{}, nil
+    return
 }

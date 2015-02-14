@@ -55,54 +55,120 @@ import "strconv"
     }
 
     action store_feature_content {
-      kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        name, description := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Feature]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.feature(keyword, nameDescription[0], nameDescription[1], currentLine);
+        feature = Feature{
+            Name: name,
+            StartsAt: DocumentLocation{ Filename: filename, Line: currentLine },
+            ConditionsOfSatisfaction: description,
+            Tags: tags,
+            Language: "en",
+            Background: nil,
+            Scenario: []Scenario{},
+        }
 
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        tags = tags[:0]
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     }
 
     action store_background_content {
-      kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Background]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.background(keyword, nameDescription[0], nameDescription[1], currentLine);
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        background := Scenario{
+            Feature:    &feature,
+            Name:       name,
+            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+            Tags:       tags,
+            Background: true,
+            Steps:      []Step{},
+            TableData:  nil,
+        }
+
+        //lastScenario = &background
+        tags = tags[:0]
+
+        if ( examplesTable ) {
+            background.TableData = makeTable(currentTable)
+            currentTable = currentTable[:0]
+            examplesTable = false
+        }
+
+        feature.Background = &background
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     }
 
     action store_scenario_content {
-            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Scenario]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.scenario(keyword, nameDescription[0], nameDescription[1], currentLine);
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        scenario := Scenario{
+            Feature:    &feature,
+            Name:       name,
+            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+            Tags:       tags,
+            Background: false,
+            Steps:      []Step{},
+            TableData:  nil,
+        }
+
+        //lastScenario = &scenario
+        tags = tags[:0]
+
+        if ( examplesTable ) {
+            scenario.TableData = makeTable(currentTable)
+            currentTable = currentTable[:0]
+            examplesTable = false
+        }
+
+        feature.Scenario = append( feature.Scenario, scenario )
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     }
 
     action store_scenario_outline_content {
-            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Scenario Outline]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.scenarioOutline(keyword, nameDescription[0], nameDescription[1], currentLine);
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        scenario := Scenario{
+            Feature:    &feature,
+            Name:       name,
+            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+            Tags:       tags,
+            Background: false,
+            Steps:      []Step{},
+            TableData:  nil,
+        }
+
+        //lastScenario = &scenario
+        tags = tags[:0]
+
+        if ( examplesTable ) {
+            scenario.TableData = makeTable(currentTable)
+            currentTable = currentTable[:0]
+            examplesTable = false
+        }
+
+        feature.Scenario = append( feature.Scenario, scenario )
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     }
 
     action store_examples_content {
-            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-      name, description := nameAndUnindentedDescription( startCol, kcon );
+        //kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+        //name, description := nameAndUnindentedDescription( startCol, kcon );
 
-      fmt.Printf("Item Typ: [Examples]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
-      // listener.examples(keyword, nameDescription[0], nameDescription[1], currentLine);
-      if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-      nextKeywordStart = -1
+        examplesTable = true;
+
+        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
+        nextKeywordStart = -1
     }
 
     action store_step_content {
@@ -110,22 +176,26 @@ import "strconv"
         con = strings.TrimSpace( con )
         fmt.Printf("Store Thing: [Step]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
       // listener.step(keyword, substring(data, contentStart, p).trim(), currentLine);
+
     }
 
     action store_comment_content {
         con := string( data[contentStart:p] )
         con = strings.TrimSpace( con )
-        fmt.Printf("Store Thing: [Comment]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
-      // listener.comment(substring(data, contentStart, p).trim(), lineNumber);
-      keywordStart = -1
+        // Discard comments
+        // fmt.Printf("Store Thing: [Comment]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
+        // listener.comment(substring(data, contentStart, p).trim(), lineNumber);
+        keywordStart = -1
     }
 
     action store_tag_content {
-              con := string( data[contentStart:p] )
+        con := string( data[contentStart:p] )
         con = strings.TrimSpace( con )
-        fmt.Printf("Store Thing: [Tag]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
-      // listener.tag(substring(data, contentStart, p).trim(), currentLine);
-      keywordStart = -1
+        con = strings.TrimLeft( con, "@" ) // Don't need the @
+
+        tags = append( tags, con )
+
+        keywordStart = -1
     }
 
     action inc_line_number {
@@ -162,27 +232,22 @@ import "strconv"
     }
 
     action store_cell_content {
-      con := string(data[contentStart:p])
-      con = strings.TrimSpace(con)
-      con = strings.Replace(con, "\\|", "|", -1)
-      con = strings.Replace(con, "\\n", "\n", -1)
-      con = strings.Replace(con, "\\\\", "\\", -1)
-      // fmt.Printf("store_cell_conent: [%s]\n", con)
-      currentRow = append( currentRow, con )
+        con := string(data[contentStart:p])
+        con = strings.TrimSpace(con)
+        con = strings.Replace(con, "\\|", "|", -1)
+        con = strings.Replace(con, "\\n", "\n", -1)
+        con = strings.Replace(con, "\\\\", "\\", -1)
+        currentRow = append( currentRow, con )
     }
 
     action store_row {
-      fmt.Printf("store_row: [%s] [%s]\n", currentRow, currentLine )
-      // listener.row(currentRow, currentLine);
+        currentTable = append( currentTable, currentRow )
     }
 
     action end_feature {
       if(cs < lexer_first_final) {
           content := currentLineContent( data, lastNewline )
           panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
-      } else {
-        fmt.Printf("EOF\n")
-         // listener.eof();
       }
     }
 
@@ -199,7 +264,6 @@ func currentLineContent(data []byte, lastNewline int) (string) {
 }
 
 func unindent(startCol int, text []byte) (string) {
-
     regex, err := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
 
     if ( err != nil ) {
@@ -219,7 +283,7 @@ func keywordContent( data []byte, p int, eof int, nextKeywordStart int, contentS
 }
 
 
-func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, string) {
+func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, []string) {
     text := unindent( startCol, textBytes )
     text = strings.TrimSpace( text )
     lines := strings.Split(text, "\n")
@@ -229,15 +293,19 @@ func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, strin
       }
 
     if ( len(lines) == 0 ) {
-      return "", ""
+      return "", []string{}
     } else if ( len(lines) == 1 ) {
-      return lines[0],""
+      return lines[0], []string{}
       } else {
-        return lines[0], strings.Join(lines[1:], "\n")
+        return lines[0], lines[1:]
       }
 }
 
-func ParseFeature(data []byte) (feature Feature, err error) {
+func makeTable(rows [][]string) (*TableData) {
+    return &TableData{}
+}
+
+func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 
   // Original ragel parser assumes this will be there, who am I to argue?
   data = append(data, []byte("%_FEATURE_END_%")...)
@@ -260,7 +328,14 @@ func ParseFeature(data []byte) (feature Feature, err error) {
   keywordStart := -1
 
   var keyword string
+  var currentTable [][]string
   var currentRow []string
+
+  var tags []string
+//  var lastScenario *Scenario = nil;
+//  var lastStep *Step = nil;
+
+  var examplesTable bool = false;
 
   // START: write init
     %% write init;
@@ -271,5 +346,5 @@ func ParseFeature(data []byte) (feature Feature, err error) {
   // END: write init
 
 
-    return Feature{}, nil
+    return
 }
