@@ -3,7 +3,6 @@ package examples
 import g "github.com/sheriff/gocumber/gocumber"
 import d "github.com/sheriff/gocumber/gocumber/langs"
 
-//import "crypto"
 import "hash"
 import "crypto/md5"
 import "encoding/base64"
