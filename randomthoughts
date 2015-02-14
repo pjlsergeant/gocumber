@@ -2,11 +2,11 @@
 
 
 Todo:
-    - Execute a Scenario
+    + Execute a Scenario
+    - Add a first text harness
+    - Implement the short-circuiting properly
     - Execute Feature (with background, expanded data steps)
-    - Keep track of pass, fail, skip, and skip appropriately
-    - Write a simple text formatter
-    - Write a data formatter
+    - Write a data harness
     - Integrate the ragel parser
     - Write a command-line tool
     - Get a code review

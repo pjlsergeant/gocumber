@@ -2,6 +2,8 @@ package gocumber
 
 import "fmt"
 import "strings"
+import "regexp"
+import "strconv"
 
 // USEFUL URLs:
 //    https://github.com/bnoordhuis/ragel/blob/master/examples/go/url.rl
@@ -39,56 +41,89 @@ import "strings"
     }
 
     action store_docstring_content {
-      // String con = unindent(startCol, substring(data, contentStart, nextKeywordStart-1).replaceFirst("(\\r?\\n)?([\\t ])*\\Z", "").replace("\\\"\\\"\\\"", "\"\"\""));
-      // String conType = substring(data, docstringContentTypeStart, docstringContentTypeEnd).trim();
+      rawcon := data[contentStart:nextKeywordStart-1]
+
+      con := unindent( startCol, rawcon )
+      con = strings.Replace( con, "\\\"\\\"\\\"", "\"\"\"", -1 )
+      con = strings.TrimLeft( con, " \t\r\n" )
+
+      conType := string(data[docstringContentTypeStart:docstringContentTypeEnd])
+      conType = strings.TrimSpace( conType )
+
+      fmt.Printf("DocString Type:[%s]\nDocString Cont:[%s]\n", conType, con)
       // listener.docString(conType, con, currentLine);
     }
 
     action store_feature_content {
-      // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
+      kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+      name, description := nameAndUnindentedDescription( startCol, kcon );
+
+      fmt.Printf("Item Typ: [Feature]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
       // listener.feature(keyword, nameDescription[0], nameDescription[1], currentLine);
+
       if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
       nextKeywordStart = -1
     }
 
     action store_background_content {
-      // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
+      kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+      name, description := nameAndUnindentedDescription( startCol, kcon );
+
+      fmt.Printf("Item Typ: [Background]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
       // listener.background(keyword, nameDescription[0], nameDescription[1], currentLine);
       if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
       nextKeywordStart = -1
     }
 
     action store_scenario_content {
-      // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
+            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+      name, description := nameAndUnindentedDescription( startCol, kcon );
+
+      fmt.Printf("Item Typ: [Scenario]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
       // listener.scenario(keyword, nameDescription[0], nameDescription[1], currentLine);
       if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
       nextKeywordStart = -1
     }
 
     action store_scenario_outline_content {
-      // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
+            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+      name, description := nameAndUnindentedDescription( startCol, kcon );
+
+      fmt.Printf("Item Typ: [Scenario Outline]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
       // listener.scenarioOutline(keyword, nameDescription[0], nameDescription[1], currentLine);
       if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
       nextKeywordStart = -1
     }
 
     action store_examples_content {
-      // String[] nameDescription = nameAndUnindentedDescription(startCol, keywordContent(data, p, eof, nextKeywordStart, contentStart));
+            kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+      name, description := nameAndUnindentedDescription( startCol, kcon );
+
+      fmt.Printf("Item Typ: [Examples]\nItem Key: [%s]\nItem Nam: [%s]\nItem Des: [%s]\n", keyword, name, description)
       // listener.examples(keyword, nameDescription[0], nameDescription[1], currentLine);
       if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
       nextKeywordStart = -1
     }
 
     action store_step_content {
+        con := string( data[contentStart:p] )
+        con = strings.TrimSpace( con )
+        fmt.Printf("Store Thing: [Step]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
       // listener.step(keyword, substring(data, contentStart, p).trim(), currentLine);
     }
 
     action store_comment_content {
+        con := string( data[contentStart:p] )
+        con = strings.TrimSpace( con )
+        fmt.Printf("Store Thing: [Comment]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
       // listener.comment(substring(data, contentStart, p).trim(), lineNumber);
       keywordStart = -1
     }
 
     action store_tag_content {
+              con := string( data[contentStart:p] )
+        con = strings.TrimSpace( con )
+        fmt.Printf("Store Thing: [Tag]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
       // listener.tag(substring(data, contentStart, p).trim(), currentLine);
       keywordStart = -1
     }
@@ -127,15 +162,17 @@ import "strings"
     }
 
     action store_cell_content {
-      // String con = substring(data, contentStart, p).trim();
-      // currentRow.add(con
-      //   .replace("\\|", "|")
-      //   .replace("\\n", "\n")
-      //   .replace("\\\\", "\\")
-      // );
+      con := string(data[contentStart:p])
+      con = strings.TrimSpace(con)
+      con = strings.Replace(con, "\\|", "|", -1)
+      con = strings.Replace(con, "\\n", "\n", -1)
+      con = strings.Replace(con, "\\\\", "\\", -1)
+      // fmt.Printf("store_cell_conent: [%s]\n", con)
+      currentRow = append( currentRow, con )
     }
 
     action store_row {
+      fmt.Printf("store_row: [%s] [%s]\n", currentRow, currentLine )
       // listener.row(currentRow, currentLine);
     }
 
@@ -143,16 +180,10 @@ import "strings"
       if(cs < lexer_first_final) {
           content := currentLineContent( data, lastNewline )
           panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
-          // Silence warnings about these being unused...
-          panic( currentLine )
-          panic(contentStart)
-          panic(docstringContentTypeStart)
-          panic(docstringContentTypeEnd)
-          panic(startCol)
+      } else {
+        fmt.Printf("EOF\n")
+         // listener.eof();
       }
-      // } else {
-      //   listener.eof();
-      // }
     }
 
     include lexer_common "lexer_common_english.rl";
@@ -167,7 +198,44 @@ func currentLineContent(data []byte, lastNewline int) (string) {
     return strings.TrimSpace( current )
 }
 
+func unindent(startCol int, text []byte) (string) {
 
+    regex, err := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
+
+    if ( err != nil ) {
+      panic(err)
+    }
+    result := regex.ReplaceAll( text, text[:0] )
+    return string(result)
+}
+
+func keywordContent( data []byte, p int, eof int, nextKeywordStart int, contentStart int ) ([]byte) {
+    endPoint := nextKeywordStart
+    if ( (nextKeywordStart == -1 || (p == eof)) ) {
+        endPoint = p
+    }
+    con := data[contentStart:endPoint]
+    return con
+}
+
+
+func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, string) {
+    text := unindent( startCol, textBytes )
+    text = strings.TrimSpace( text )
+    lines := strings.Split(text, "\n")
+
+      for index,element := range lines {
+        lines[index] = strings.TrimSpace(element)
+      }
+
+    if ( len(lines) == 0 ) {
+      return "", ""
+    } else if ( len(lines) == 1 ) {
+      return lines[0],""
+      } else {
+        return lines[0], strings.Join(lines[1:], "\n")
+      }
+}
 
 func ParseFeature(data []byte) (feature Feature, err error) {
 
