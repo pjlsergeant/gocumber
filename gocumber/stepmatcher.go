@@ -16,6 +16,8 @@ type StepMatcher struct {
 	Any   []StepDefinition
 }
 
+var Steps *StepMatcher
+
 type StepDefinition struct {
 	Regexp *regexp.Regexp
 	Body   func(StepContext)
@@ -29,19 +31,21 @@ type StepContext struct {
 	T             *testing.T
 }
 
-func (m *StepMatcher) Add(verb string, regexStr string, body func(StepContext)) {
+func Add(verb string, regexStr string, body func(StepContext)) {
 	regex := regexp.MustCompile(regexStr)
 	definition := StepDefinition{regex, body}
 
+	m := &Steps
+
 	switch verb {
 	case "Given":
-		m.Given = append(m.Given, definition)
+		(*m).Given = append((*m).Given, definition)
 	case "When":
-		m.When = append(m.When, definition)
+		(*m).When = append((*m).When, definition)
 	case "Then":
-		m.Then = append(m.Then, definition)
+		(*m).Then = append((*m).Then, definition)
 	case "Any":
-		m.Any = append(m.Any, definition)
+		(*m).Any = append((*m).Any, definition)
 	default:
 		panic("You can only define handlers for Given/When/Then/Any, but you have: " + verb)
 	}
@@ -90,4 +94,8 @@ func (m StepMatcher) Match(c *StepContext) (f func(StepContext)) {
 	}
 
 	return f
+}
+
+func init() {
+	Steps = &StepMatcher{}
 }

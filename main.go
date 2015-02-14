@@ -1,6 +1,8 @@
 package main
 
 import "fmt"
+
+import ex "github.com/sheriff/gocumber/gocumber/examples"
 import "github.com/sheriff/gocumber/gocumber"
 import "io/ioutil"
 
@@ -18,20 +20,20 @@ func main() {
 	f, err := gocumber.ParseFeature(dat)
 	check(err)
 
-	fmt.Printf("Feature: %+v\n", f)
+	// fmt.Printf("Feature: %+v\n", f)
 
-	//f := gocumber.Feature_digestfeature()
+	f = ex.Feature_digestfeature()
 
 	// Load the step definitions in to a StepMatcher
-	// sm := gocumber.StepMatcher{}
+	sm := gocumber.Steps
 	// gocumber.AddDigestDefinitions(&sm)
 
-	// e := gocumber.Executor{
-	// 	StepMatcher: sm,
-	// 	Feature:     f,
-	// }
+	e := gocumber.Executor{
+		StepMatcher: sm,
+		Feature:     f,
+	}
 
-	// e.RunScenario(f.Scenario[0])
+	e.RunScenario(f.Scenario[0])
 
-	// fmt.Printf("Stash: %+v\n", e.Stash)
+	fmt.Printf("Stash: %+v\n", e.Stash)
 }

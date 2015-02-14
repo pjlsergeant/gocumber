@@ -10,7 +10,7 @@ const (
 )
 
 type Executor struct {
-	StepMatcher StepMatcher
+	StepMatcher *StepMatcher
 	Feature     Feature
 	Stash       map[string]interface{}
 	T           *testing.T
@@ -21,6 +21,11 @@ func (e *Executor) RunScenario(sc Scenario) int {
 	// Check we already have a stash
 	if e.Stash == nil {
 		e.Stash = make(map[string]interface{})
+	}
+
+	// Use the global stepmatcher if we don't have one injected
+	if e.StepMatcher == nil {
+		e.StepMatcher = Steps
 	}
 
 	scenarioStatus := passed
