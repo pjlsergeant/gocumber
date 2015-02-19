@@ -126,7 +126,9 @@ func (e Executor) RunStep(s Step, skip bool) (int, string) {
 	// Can we find a matching step definition
 	sd := e.StepMatcher.Match(&sc)
 
-	if sd != nil {
+	if skip {
+		return pending, ""
+	} else if sd != nil {
 		success, output := testSandbox(s.Text, &sc, sd)
 
 		if success {
