@@ -4,17 +4,23 @@
 Todo:
     + Execute a Scenario
     - You've left the parser half-done
-        - It doesn't add steps properly
-        - It doesn't save a step's table properly
+        + It doesn't add steps properly
+            + Hrm, still not working.
+        + It doesn't save a step's table properly
         - makeTable is a no-op
+        - Properly handle exceptions by returning an error
 
-    - Add a first text harness
-    - Implement the short-circuiting properly
+    - Add a first text harness for output - scenario_start scenario_done etc
+    + Implement the short-circuiting properly
     - Execute Feature (with background, expanded data steps)
     - Write a data harness
-    - Integrate the ragel parser
-    - Write a command-line tool
+    + Integrate the ragel parser
+    - Write a command-line tool example
     - Get a code review
+    - Document the shit out of it
+
+    - Allow other languages again
+
 
 
 -------

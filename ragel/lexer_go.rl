@@ -5,6 +5,12 @@ import "strings"
 import "regexp"
 import "strconv"
 
+const (
+  typeBackground = iota
+  typeScenario
+  typeOutline
+)
+
 // USEFUL URLs:
 //    https://github.com/bnoordhuis/ragel/blob/master/examples/go/url.rl
 //    http://thingsaaronmade.com/blog/a-simple-intro-to-writing-a-lexer-with-ragel.html
@@ -50,25 +56,14 @@ import "strconv"
       conType := string(data[docstringContentTypeStart:docstringContentTypeEnd])
       conType = strings.TrimSpace( conType )
 
-      fmt.Printf("DocString Type:[%s]\nDocString Cont:[%s]\n", conType, con)
-      // listener.docString(conType, con, currentLine);
+      fb.addDocString( currentLine, con, conType )
     }
 
     action store_feature_content {
         kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
         name, description := nameAndUnindentedDescription( startCol, kcon );
 
-        feature = Feature{
-            Name: name,
-            StartsAt: DocumentLocation{ Filename: filename, Line: currentLine },
-            ConditionsOfSatisfaction: description,
-            Tags: tags,
-            Language: "en",
-            Background: nil,
-            Scenario: []Scenario{},
-        }
-
-        tags = tags[:0]
+        fb.addFeature( currentLine, name, description )
 
         if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
         nextKeywordStart = -1
@@ -78,26 +73,28 @@ import "strconv"
         kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
         name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-        background := Scenario{
-            Feature:    &feature,
-            Name:       name,
-            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
-            Tags:       tags,
-            Background: true,
-            Steps:      []Step{},
-            TableData:  nil,
-        }
+        fb.addScenario( currentLine, typeBackground, name )
 
-        //lastScenario = &background
-        tags = tags[:0]
+        // background := Scenario{
+        //     Feature:    &feature,
+        //     Name:       name,
+        //     StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+        //     Tags:       tags,
+        //     Background: true,
+        //     Steps:      []Step{},
+        //     TableData:  nil,
+        // }
 
-        if ( examplesTable ) {
-            background.TableData = makeTable(currentTable)
-            currentTable = currentTable[:0]
-            examplesTable = false
-        }
+        // lastScenario = &background
+        // tags = tags[:0]
 
-        feature.Background = &background
+        // if ( examplesTable ) {
+        //     background.TableData = makeTable(currentTable)
+        //     currentTable = currentTable[:0]
+        //     examplesTable = false
+        // }
+
+        // feature.Background = &background
 
         if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
         nextKeywordStart = -1
@@ -107,26 +104,28 @@ import "strconv"
         kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
         name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-        scenario := Scenario{
-            Feature:    &feature,
-            Name:       name,
-            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
-            Tags:       tags,
-            Background: false,
-            Steps:      []Step{},
-            TableData:  nil,
-        }
+        fb.addScenario( currentLine, typeScenario, name )
 
-        //lastScenario = &scenario
-        tags = tags[:0]
+        // scenario := Scenario{
+        //     Feature:    &feature,
+        //     Name:       name,
+        //     StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+        //     Tags:       tags,
+        //     Background: false,
+        //     Steps:      []Step{},
+        //     TableData:  nil,
+        // }
 
-        if ( examplesTable ) {
-            scenario.TableData = makeTable(currentTable)
-            currentTable = currentTable[:0]
-            examplesTable = false
-        }
+        // lastScenario = &scenario
+        // tags = tags[:0]
 
-        feature.Scenario = append( feature.Scenario, scenario )
+        // if ( examplesTable ) {
+        //     scenario.TableData = makeTable(currentTable)
+        //     currentTable = currentTable[:0]
+        //     examplesTable = false
+        // }
+
+        // feature.Scenario = append( feature.Scenario, scenario )
 
         if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
         nextKeywordStart = -1
@@ -136,26 +135,28 @@ import "strconv"
         kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
         name, _ := nameAndUnindentedDescription( startCol, kcon );
 
-        scenario := Scenario{
-            Feature:    &feature,
-            Name:       name,
-            StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
-            Tags:       tags,
-            Background: false,
-            Steps:      []Step{},
-            TableData:  nil,
-        }
+        fb.addScenario( currentLine, typeOutline, name )
 
-        //lastScenario = &scenario
-        tags = tags[:0]
+        // scenario := Scenario{
+        //     Feature:    &feature,
+        //     Name:       name,
+        //     StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
+        //     Tags:       tags,
+        //     Background: false,
+        //     Steps:      []Step{},
+        //     TableData:  nil,
+        // }
 
-        if ( examplesTable ) {
-            scenario.TableData = makeTable(currentTable)
-            currentTable = currentTable[:0]
-            examplesTable = false
-        }
+        // lastScenario = &scenario
+        // tags = tags[:0]
 
-        feature.Scenario = append( feature.Scenario, scenario )
+        // if ( examplesTable ) {
+        //     scenario.TableData = makeTable(currentTable)
+        //     currentTable = currentTable[:0]
+        //     examplesTable = false
+        // }
+
+        // feature.Scenario = append( feature.Scenario, scenario )
 
         if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
         nextKeywordStart = -1
@@ -165,7 +166,9 @@ import "strconv"
         //kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
         //name, description := nameAndUnindentedDescription( startCol, kcon );
 
-        examplesTable = true;
+        fb.addExamples( currentLine )
+
+        // examplesTable = true;
 
         if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
         nextKeywordStart = -1
@@ -174,9 +177,22 @@ import "strconv"
     action store_step_content {
         con := string( data[contentStart:p] )
         con = strings.TrimSpace( con )
-        fmt.Printf("Store Thing: [Step]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
-      // listener.step(keyword, substring(data, contentStart, p).trim(), currentLine);
 
+        // step := Step{
+        //     Scenario:     lastScenario,
+        //     Text:         con,
+        //     StartsAt:DocumentLocation{ Filename: filename, Line: currentLine },
+        //     Verb: keyword,
+        //     OriginalVerb: keyword,
+        //     TableData: nil,
+        //     DocString: "",
+        // }
+
+        fb.addStep( currentLine, keyword, con )
+
+        // //fmt.Printf("Before: [%+v]\n", lastScenario.Steps)
+        // lastScenario.Steps = append( lastScenario.Steps, step )
+        //fmt.Printf("After : [%+v]\n", lastScenario.Steps)
     }
 
     action store_comment_content {
@@ -193,7 +209,7 @@ import "strconv"
         con = strings.TrimSpace( con )
         con = strings.TrimLeft( con, "@" ) // Don't need the @
 
-        tags = append( tags, con )
+        fb.addTag( currentLine, con )
 
         keywordStart = -1
     }
@@ -223,7 +239,7 @@ import "strconv"
 
     action start_row {
       p = p - 1
-      currentRow = currentRow[:0]
+      //currentRow = currentRow[:0]
       currentLine = lineNumber
     }
 
@@ -237,11 +253,13 @@ import "strconv"
         con = strings.Replace(con, "\\|", "|", -1)
         con = strings.Replace(con, "\\n", "\n", -1)
         con = strings.Replace(con, "\\\\", "\\", -1)
-        currentRow = append( currentRow, con )
+        fb.addCell( con )
+        // currentRow = append( currentRow, con )
     }
 
     action store_row {
-        currentTable = append( currentTable, currentRow )
+        fb.rowEnd()
+        // currentTable = append( currentTable, currentRow )
     }
 
     action end_feature {
@@ -301,41 +319,185 @@ func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, []str
       }
 }
 
-func makeTable(rows [][]string) (*TableData) {
-    return &TableData{}
+func makeTable(dl *DocumentLocation, rows [][]string) (*TableData) {
+    columns := rows[0]
+    bodyRows := rows[1:0]
+
+    panic("Finish makeTable()")
+
+    table := &TableData{
+      StartsAt: *dl,
+    }
+    return table
+}
+
+type FeatureBuilder struct {
+    feature *Feature
+    scenario *Scenario
+    step *Step
+    table [][]string
+    row []string
+    tags []string
+    examplesTable *DocumentLocation
+    filename string
+    lastVerb string
+}
+
+func (fb *FeatureBuilder) addFeature ( currentLine int, name string, cos []string ) {
+    //fmt.Printf("[%d] addFeature: [%s] {%s}\n", currentLine, name, strings.Join( cos, "\n" ) )
+    //fmt.Printf("[%d] .. tags: [%s]\n", currentLine, strings.Join( fb.getTags(), ", "))
+
+    fb.feature = &Feature{
+        Name: name,
+        StartsAt: DocumentLocation{ Filename: fb.filename, Line: currentLine },
+        ConditionsOfSatisfaction: cos,
+        Tags: fb.getTags(),
+        Language: "en",
+        Background: nil,
+        Scenarios: []Scenario{},
+    }
+}
+
+func (fb *FeatureBuilder) getFeature () (*Feature) {
+    return fb.feature
+}
+
+// Tags
+func (fb *FeatureBuilder) addTag (currentLine int, tag string) {
+    // fmt.Printf("[%d] addTag: [%s]\n", currentLine, tag)
+    fb.tags = append( fb.tags, tag )
+}
+
+func (fb *FeatureBuilder) getTags () ([]string) {
+    tags := fb.tags
+    fb.tags = fb.tags[:0]
+    return tags
+}
+
+func (fb *FeatureBuilder) addCell (content string) {
+    fb.row = append( fb.row, content )
+}
+
+func (fb *FeatureBuilder) rowEnd() {
+    fb.table = append( fb.table, fb.row )
+    fb.row = fb.row[:0]
+}
+
+func (fb *FeatureBuilder) getRows () ([][]string) {
+    rows := fb.table
+    fb.table = fb.table[:0]
+    return rows
+}
+
+func (fb *FeatureBuilder) addScenario ( currentLine int, stype int, name string ) {
+    fmt.Printf("[%d] addScenario: [%d][%s]\n", currentLine, stype, name)
+    fmt.Printf("[%d] .. tags: [%s]\n", currentLine, strings.Join(fb.getTags(), ", "))
+
+    if ( fb.examplesTable != nil ) {
+        dl := fb.examplesTable
+        fb.examplesTable = nil
+        fb.step.TableData = makeTable( dl, fb.getRows() )
+    }
+
+    scenario := Scenario{
+        Feature: fb.feature,
+        Name:       name,
+        StartsAt:   DocumentLocation{ Filename: fb.filename, Line: currentLine },
+        Tags:       fb.getTags(),
+        Background: false,
+        Steps:      []Step{},
+        TableData:  nil,
+    }
+
+    if ( stype == typeBackground ) {
+        scenario.Background = true
+        fb.feature.Background = &scenario
+        fb.scenario = &scenario
+    } else {
+        fb.feature.Scenarios = append( fb.feature.Scenarios, scenario )
+        sref := &fb.feature.Scenarios[ len(fb.feature.Scenarios) - 1 ]
+        fb.scenario = sref
+    }
+
+    fb.lastVerb = ""
+}
+
+func (fb *FeatureBuilder) addStep ( currentLine int, verb string, content string ) {
+    fmt.Printf("[%d] addStep [%s] [%s]\n", currentLine, verb, content )
+
+    // Deal with "and" as a verb
+    originalVerb := verb
+    if ( verb == "And" ) {
+        if ( fb.lastVerb == "" ) {
+            panic("Can't use 'And' as first step of a scenario")
+        } else {
+            verb = fb.lastVerb
+        }
+    }
+    fb.lastVerb = verb
+
+    step := Step{
+        Scenario: fb.scenario,
+        Text: content,
+        StartsAt:   DocumentLocation{ Filename: fb.filename, Line: currentLine },
+        Verb: verb,
+        OriginalVerb: originalVerb,
+        TableData: nil,
+        DocString: nil,
+    }
+
+    fb.scenario.Steps = append( fb.scenario.Steps, step )
+    sref := &fb.scenario.Steps[ len(fb.scenario.Steps) - 1 ]
+    fb.step = sref
+}
+
+func (fb *FeatureBuilder) addDocString (currentLine int, docstring string, contentType string) {
+    if ( len(contentType) < 1 ) {
+        contentType = "text/plain"
+    }
+
+    d := &DocString{
+        ContentType: docstring,
+        StartsAt:   DocumentLocation{ Filename: fb.filename, Line: currentLine },
+        Content: docstring,
+    }
+
+    fb.step.DocString = d
+
+}
+
+func (fb *FeatureBuilder) addExamples ( currentLine int ) {
+    fb.examplesTable = &DocumentLocation{ Filename: fb.filename, Line: currentLine }
+    //fmt.Printf("[%d] addExamples\n", currentLine);
 }
 
 func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 
-  // Original ragel parser assumes this will be there, who am I to argue?
-  data = append(data, []byte("%_FEATURE_END_%")...)
+    // Original ragel parser assumes this will be there, who am I to argue?
+    data = append(data, []byte("%_FEATURE_END_%")...)
 
-  cs := 0 // No idea what this is
-  p := 0 // Position?
-  pe := len(data) // No idea
-  eof := len(data) // Location of EOF
+    cs := 0 // No idea what this is
+    p := 0 // Position?
+    pe := len(data) // No idea
+    eof := len(data) // Location of EOF
 
-  lineNumber := 1
-  lastNewline := 0
+    lineNumber := 1
+    lastNewline := 0
 
-  contentStart := -1
-  currentLine := -1
+    contentStart := -1
+    currentLine := -1
 
-  docstringContentTypeStart := -1
-  docstringContentTypeEnd := -1
-  startCol := -1;
-  nextKeywordStart := -1
-  keywordStart := -1
+    docstringContentTypeStart := -1
+    docstringContentTypeEnd := -1
+    startCol := -1;
+    nextKeywordStart := -1
+    keywordStart := -1
 
-  var keyword string
-  var currentTable [][]string
-  var currentRow []string
+    var keyword string
 
-  var tags []string
-//  var lastScenario *Scenario = nil;
-//  var lastStep *Step = nil;
-
-  var examplesTable bool = false;
+    fb := FeatureBuilder{
+        filename: filename,
+    }
 
   // START: write init
     %% write init;
@@ -345,6 +507,8 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
     %% write exec;
   // END: write init
 
+    feature = *fb.getFeature()
+    fmt.Printf("Feature: %+v\n", feature.Scenarios)
 
     return
 }

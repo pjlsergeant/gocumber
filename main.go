@@ -1,8 +1,8 @@
 package main
 
-import "fmt"
+//import "fmt"
 
-import ex "github.com/sheriff/gocumber/gocumber/examples" // Use _ instead of ex when you don't need anything from it
+import _ "github.com/sheriff/gocumber/gocumber/examples"
 import "github.com/sheriff/gocumber/gocumber"
 import "io/ioutil"
 
@@ -20,9 +20,7 @@ func main() {
 	f, err := gocumber.ParseFeature(dat, "basic.feature")
 	check(err)
 
-	fmt.Printf("Feature: %+v\n", f)
-
-	f = ex.Feature_digestfeature()
+	// fmt.Printf("Feature: %+v\n", f.Scenarios[0])
 
 	// Load the step definitions in to a StepMatcher
 	sm := gocumber.Steps
@@ -33,7 +31,9 @@ func main() {
 		Feature:     f,
 	}
 
-	e.RunScenario(f.Scenario[0])
+	for _, s := range f.Scenarios {
+		e.RunScenario(s)
+	}
 
 	//fmt.Printf("Stash: %+v\n", e.Stash)
 }
