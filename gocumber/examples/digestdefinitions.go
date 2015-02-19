@@ -5,6 +5,7 @@ import d "github.com/sheriff/gocumber/gocumber/langs"
 
 import "hash"
 import "crypto/md5"
+import "crypto/sha1"
 import "encoding/base64"
 import "encoding/hex"
 
@@ -20,6 +21,8 @@ func init() {
 		switch s.Matches[1] {
 		case "MD5":
 			hash_object = md5.New()
+		case "SHA-1":
+			hash_object = sha1.New()
 		default:
 			panic("Don't know about hash type: " + s.Matches[1])
 		}
@@ -27,6 +30,10 @@ func init() {
 
 	d.When("I've added \"(.+)\" to the object", func(s g.StepContext) {
 		hash_object.Write([]byte(s.Matches[1]))
+	})
+
+	d.When("I've added the following to the object", func(s g.StepContext) {
+		hash_object.Write([]byte(s.Step.DocString.Content))
 	})
 
 	d.Then("the hex output is \"(.+)\"", func(s g.StepContext) {
