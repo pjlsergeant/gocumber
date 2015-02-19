@@ -5,9 +5,16 @@ type DocumentLocation struct {
 	Line     int
 }
 
+type DocString struct {
+	StartsAt    DocumentLocation
+	ContentType string
+	Content     string
+}
+
 type TableData struct {
-	Columns []string
-	Data    []map[string]string
+	StartsAt DocumentLocation
+	Columns  []string
+	Data     []map[string]string
 }
 
 type Step struct {
@@ -17,7 +24,7 @@ type Step struct {
 	Verb         string
 	OriginalVerb string
 	TableData    *TableData
-	DocString    string
+	DocString    *DocString
 }
 
 type Scenario struct {
@@ -28,7 +35,7 @@ type Scenario struct {
 	Background bool
 	Steps      []Step
 	TableData  *TableData
-	DocString  string
+	DocString  *DocString
 }
 
 type Feature struct {
@@ -38,5 +45,5 @@ type Feature struct {
 	Tags                     []string
 	Language                 string
 	Background               *Scenario
-	Scenario                 []Scenario
+	Scenarios                []Scenario
 }
