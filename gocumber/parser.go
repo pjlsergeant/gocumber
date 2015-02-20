@@ -1,5 +1,5 @@
 
-//line ragel/lexer_go.rl:1
+//line ragel/lexer.go:1
 package gocumber
 
 import "fmt"
@@ -8,23 +8,25 @@ import "regexp"
 import "strconv"
 
 const (
-  typeBackground = iota
-  typeScenario
-  typeOutline
+	typeBackground = iota
+	typeScenario
+	typeOutline
 )
 
 // USEFUL URLs:
 //    https://github.com/bnoordhuis/ragel/blob/master/examples/go/url.rl
 //    http://thingsaaronmade.com/blog/a-simple-intro-to-writing-a-lexer-with-ragel.html
 //    https://raw.githubusercontent.com/cucumber/gherkin/master/ragel/lexer.java.rl.erb
+// Search: action ([^ ]+)
+// Replac: action \1
 
-  
-//line ragel/lexer_go.rl:273
+
+//line ragel/lexer.go:201
 
 
-  // START: write data noerror;
-  
-//line gocumber/parser.go:28
+// START: write data noerror;
+
+//line gocumber/parser.go:30
 var _lexer_actions []byte = []byte{
 	0, 1, 0, 1, 1, 1, 2, 1, 3, 
 	1, 4, 1, 5, 1, 6, 1, 7, 
@@ -578,239 +580,250 @@ const lexer_first_final int = 292
 const lexer_en_main int = 1
 
 
-//line ragel/lexer_go.rl:277
-  // END: write data noerror;
+//line ragel/lexer.go:205
+// END: write data noerror;
 
-func currentLineContent(data []byte, lastNewline int) (string) {
-    current := string(data[lastNewline:])
-    return strings.TrimSpace( current )
+func currentLineContent(data []byte, lastNewline int) string {
+	current := string(data[lastNewline:])
+	return strings.TrimSpace(current)
 }
 
-func unindent(startCol int, text []byte) (string) {
-    regex, err := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
+func unindent(startCol int, text []byte) string {
+	regex, err := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
 
-    if ( err != nil ) {
-      panic(err)
-    }
-    result := regex.ReplaceAll( text, text[:0] )
-    return string(result)
+	if err != nil {
+		panic(err)
+	}
+	result := regex.ReplaceAll(text, text[:0])
+	return string(result)
 }
 
-func keywordContent( data []byte, p int, eof int, nextKeywordStart int, contentStart int ) ([]byte) {
-    endPoint := nextKeywordStart
-    if ( (nextKeywordStart == -1 || (p == eof)) ) {
-        endPoint = p
-    }
-    con := data[contentStart:endPoint]
-    return con
+func keywordContent(data []byte, p int, eof int, nextKeywordStart int, contentStart int) []byte {
+	endPoint := nextKeywordStart
+	if nextKeywordStart == -1 || (p == eof) {
+		endPoint = p
+	}
+	con := data[contentStart:endPoint]
+	return con
 }
-
 
 func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, []string) {
-    text := unindent( startCol, textBytes )
-    text = strings.TrimSpace( text )
-    lines := strings.Split(text, "\n")
+	text := unindent(startCol, textBytes)
+	text = strings.TrimSpace(text)
+	lines := strings.Split(text, "\n")
 
-      for index,element := range lines {
-        lines[index] = strings.TrimSpace(element)
-      }
+	for index, element := range lines {
+		lines[index] = strings.TrimSpace(element)
+	}
 
-    if ( len(lines) == 0 ) {
-      return "", []string{}
-    } else if ( len(lines) == 1 ) {
-      return lines[0], []string{}
-      } else {
-        return lines[0], lines[1:]
-      }
+	if len(lines) == 0 {
+		return "", []string{}
+	} else if len(lines) == 1 {
+		return lines[0], []string{}
+	} else {
+		return lines[0], lines[1:]
+	}
 }
 
-func makeTable(dl *DocumentLocation, rows [][]string) (*TableData) {
-    return &TableData{
-      StartsAt: *dl,
-    }
+func makeTable(dl *DocumentLocation, rows [][]string) *TableData {
+	//fmt.Printf("Incoming: %+v\n", rows )
+
+	columns := rows[0]
+	bodyRows := rows[1:]
+
+	table := &TableData{
+		StartsAt: *dl,
+		Columns:  columns,
+	}
+
+	for _, rowData := range bodyRows {
+		row := map[string]string{}
+
+		for i, cell := range rowData {
+
+			colName := columns[i]
+			row[colName] = cell
+		}
+		table.Data = append(table.Data, row)
+	}
+
+	fmt.Printf("Table: %+v\n", table)
+
+	return table
 }
 
 type FeatureBuilder struct {
-    feature *Feature
-    scenario *Scenario
-    step *Step
-    table [][]string
-    row []string
-    tags []string
-    examplesTable *DocumentLocation
-    filename string
-    lastVerb string
+	feature       *Feature
+	scenario      *Scenario
+	step          *Step
+	table         [][]string
+	row           []string
+	tags          []string
+	examplesTable *DocumentLocation
+	filename      string
+	lastVerb      string
 }
 
-func (fb *FeatureBuilder) addFeature ( currentLine int, name string, cos []string ) {
-    //fmt.Printf("[%d] addFeature: [%s] {%s}\n", currentLine, name, strings.Join( cos, "\n" ) )
-    //fmt.Printf("[%d] .. tags: [%s]\n", currentLine, strings.Join( fb.getTags(), ", "))
-
-    fb.feature = &Feature{
-        Name: name,
-        StartsAt: DocumentLocation{ Filename: fb.filename, Line: currentLine },
-        ConditionsOfSatisfaction: cos,
-        Tags: fb.getTags(),
-        Language: "en",
-        Background: nil,
-        Scenarios: []Scenario{},
-    }
+func (fb *FeatureBuilder) addFeature(currentLine int, name string, cos []string) {
+	fb.feature = &Feature{
+		Name:                     name,
+		StartsAt:                 DocumentLocation{Filename: fb.filename, Line: currentLine},
+		ConditionsOfSatisfaction: cos,
+		Tags:       fb.getTags(),
+		Language:   "en",
+		Background: nil,
+		Scenarios:  []Scenario{},
+	}
 }
 
-func (fb *FeatureBuilder) getFeature () (*Feature) {
-    return fb.feature
+func (fb *FeatureBuilder) getFeature() *Feature {
+	return fb.feature
 }
 
 // Tags
-func (fb *FeatureBuilder) addTag (currentLine int, tag string) {
-    // fmt.Printf("[%d] addTag: [%s]\n", currentLine, tag)
-    fb.tags = append( fb.tags, tag )
+func (fb *FeatureBuilder) addTag(currentLine int, tag string) {
+	fb.tags = append(fb.tags, tag)
 }
 
-func (fb *FeatureBuilder) getTags () ([]string) {
-    tags := fb.tags
-    fb.tags = fb.tags[:0]
-    return tags
+func (fb *FeatureBuilder) getTags() []string {
+	tags := fb.tags
+	fb.tags = fb.tags[:0]
+	return tags
 }
 
-func (fb *FeatureBuilder) addCell (content string) {
-    fb.row = append( fb.row, content )
+func (fb *FeatureBuilder) addCell(content string) {
+	fb.row = append(fb.row, content)
 }
 
 func (fb *FeatureBuilder) rowEnd() {
-    fb.table = append( fb.table, fb.row )
-    fb.row = fb.row[:0]
+	fb.table = append(fb.table, fb.row)
+	fb.row = []string{}
 }
 
-func (fb *FeatureBuilder) getRows () ([][]string) {
-    rows := fb.table
-    fb.table = fb.table[:0]
-    return rows
+func (fb *FeatureBuilder) getRows() [][]string {
+	rows := fb.table
+	fb.table = [][]string{}
+	return rows
 }
 
-func (fb *FeatureBuilder) addScenario ( currentLine int, stype int, name string ) {
-    fmt.Printf("[%d] addScenario: [%d][%s]\n", currentLine, stype, name)
-    fmt.Printf("[%d] .. tags: [%s]\n", currentLine, strings.Join(fb.getTags(), ", "))
+func (fb *FeatureBuilder) addScenario(currentLine int, stype int, name string) {
+	if fb.examplesTable != nil {
+		dl := fb.examplesTable
+		fb.examplesTable = nil
+		fb.step.TableData = makeTable(dl, fb.getRows())
+	}
 
-    if ( fb.examplesTable != nil ) {
-        dl := fb.examplesTable
-        fb.examplesTable = nil
-        fb.step.TableData = makeTable( dl, fb.getRows() )
-    }
+	scenario := Scenario{
+		Feature:    fb.feature,
+		Name:       name,
+		StartsAt:   DocumentLocation{Filename: fb.filename, Line: currentLine},
+		Tags:       fb.getTags(),
+		Background: false,
+		Steps:      []Step{},
+		TableData:  nil,
+	}
 
-    scenario := Scenario{
-        Feature: fb.feature,
-        Name:       name,
-        StartsAt:   DocumentLocation{ Filename: fb.filename, Line: currentLine },
-        Tags:       fb.getTags(),
-        Background: false,
-        Steps:      []Step{},
-        TableData:  nil,
-    }
+	if stype == typeBackground {
+		scenario.Background = true
+		fb.feature.Background = &scenario
+		fb.scenario = &scenario
+	} else {
+		fb.feature.Scenarios = append(fb.feature.Scenarios, scenario)
+		sref := &fb.feature.Scenarios[len(fb.feature.Scenarios)-1]
+		fb.scenario = sref
+	}
 
-    if ( stype == typeBackground ) {
-        scenario.Background = true
-        fb.feature.Background = &scenario
-        fb.scenario = &scenario
-    } else {
-        fb.feature.Scenarios = append( fb.feature.Scenarios, scenario )
-        sref := &fb.feature.Scenarios[ len(fb.feature.Scenarios) - 1 ]
-        fb.scenario = sref
-    }
-
-    fb.lastVerb = ""
+	fb.lastVerb = ""
 }
 
-func (fb *FeatureBuilder) addStep ( currentLine int, verb string, content string ) {
-    fmt.Printf("[%d] addStep [%s] [%s]\n", currentLine, verb, content )
+func (fb *FeatureBuilder) addStep(currentLine int, verb string, content string) {
+	fmt.Printf("[%d] addStep [%s] [%s]\n", currentLine, verb, content)
 
-    // Deal with "and" as a verb
-    originalVerb := verb
-    if ( verb == "And" ) {
-        if ( fb.lastVerb == "" ) {
-            panic("Can't use 'And' as first step of a scenario")
-        } else {
-            verb = fb.lastVerb
-        }
-    }
-    fb.lastVerb = verb
+	// Deal with "and" as a verb
+	originalVerb := verb
+	if verb == "And" {
+		if fb.lastVerb == "" {
+			panic("Can't use 'And' as first step of a scenario")
+		} else {
+			verb = fb.lastVerb
+		}
+	}
+	fb.lastVerb = verb
 
-    step := Step{
-        Scenario: fb.scenario,
-        Text: content,
-        StartsAt:   DocumentLocation{ Filename: fb.filename, Line: currentLine },
-        Verb: verb,
-        OriginalVerb: originalVerb,
-        TableData: nil,
-        DocString: nil,
-    }
+	step := Step{
+		Scenario:     fb.scenario,
+		Text:         content,
+		StartsAt:     DocumentLocation{Filename: fb.filename, Line: currentLine},
+		Verb:         verb,
+		OriginalVerb: originalVerb,
+		TableData:    nil,
+		DocString:    nil,
+	}
 
-    fb.scenario.Steps = append( fb.scenario.Steps, step )
-    sref := &fb.scenario.Steps[ len(fb.scenario.Steps) - 1 ]
-    fb.step = sref
+	fb.scenario.Steps = append(fb.scenario.Steps, step)
+	sref := &fb.scenario.Steps[len(fb.scenario.Steps)-1]
+	fb.step = sref
 }
 
-func (fb *FeatureBuilder) addDocString (currentLine int, docstring string, contentType string) {
-    if ( len(contentType) < 1 ) {
-        contentType = "text/plain"
-    }
+func (fb *FeatureBuilder) addDocString(currentLine int, docstring string, contentType string) {
+	if len(contentType) < 1 {
+		contentType = "text/plain"
+	}
 
-    d := &DocString{
-        ContentType: docstring,
-        StartsAt:   DocumentLocation{ Filename: fb.filename, Line: currentLine },
-        Content: docstring,
-    }
+	d := &DocString{
+		ContentType: docstring,
+		StartsAt:    DocumentLocation{Filename: fb.filename, Line: currentLine},
+		Content:     docstring,
+	}
 
-    fb.step.DocString = d
+	fb.step.DocString = d
 
 }
 
-func (fb *FeatureBuilder) addExamples ( currentLine int ) {
-    fb.examplesTable = &DocumentLocation{ Filename: fb.filename, Line: currentLine }
-    //fmt.Printf("[%d] addExamples\n", currentLine);
+func (fb *FeatureBuilder) addExamples(currentLine int) {
+	fb.examplesTable = &DocumentLocation{Filename: fb.filename, Line: currentLine}
 }
 
 func ParseFeature(data []byte, filename string) (feature Feature, err error) {
+	// Original ragel parser assumes this will be there, who am I to argue?
+	data = append(data, []byte("%_FEATURE_END_%")...)
 
-    // Original ragel parser assumes this will be there, who am I to argue?
-    data = append(data, []byte("%_FEATURE_END_%")...)
+	cs := 0          // No idea what this is
+	p := 0           // Position?
+	pe := len(data)  // No idea
+	eof := len(data) // Location of EOF
 
-    cs := 0 // No idea what this is
-    p := 0 // Position?
-    pe := len(data) // No idea
-    eof := len(data) // Location of EOF
+	lineNumber := 1
+	lastNewline := 0
 
-    lineNumber := 1
-    lastNewline := 0
+	contentStart := -1
+	currentLine := -1
 
-    contentStart := -1
-    currentLine := -1
+	docstringContentTypeStart := -1
+	docstringContentTypeEnd := -1
+	startCol := -1
+	nextKeywordStart := -1
+	keywordStart := -1
 
-    docstringContentTypeStart := -1
-    docstringContentTypeEnd := -1
-    startCol := -1;
-    nextKeywordStart := -1
-    keywordStart := -1
+	var keyword string
 
-    var keyword string
+	fb := FeatureBuilder{
+		filename: filename,
+	}
 
-    fb := FeatureBuilder{
-        filename: filename,
-    }
-
-  // START: write init
+// START: write init
     
-//line gocumber/parser.go:804
+//line gocumber/parser.go:817
 	{
 	cs = lexer_start
 	}
 
-//line ragel/lexer_go.rl:498
-  // END: write init
+//line ragel/lexer.go:437
+// END: write init
 
-  // START: write exec
-    
-//line gocumber/parser.go:814
+// START: write exec
+	
+//line gocumber/parser.go:827
 	{
 	var _klen int
 	var _trans int
@@ -889,279 +902,205 @@ _match:
 		_acts++
 		switch _lexer_actions[_acts-1] {
 		case 0:
-//line ragel/lexer_go.rl:23
+//line ragel/lexer.go:25
 
-      contentStart = p
-      currentLine = lineNumber
+	contentStart = p
+	currentLine = lineNumber
 
-      if(len(keyword) != 0) {
-        startCol = p - lastNewline - (len(keyword) + 1);
-      }
-    
+	if len(keyword) != 0 {
+		startCol = p - lastNewline - (len(keyword) + 1)
+	}
+
 		case 1:
-//line ragel/lexer_go.rl:32
+//line ragel/lexer.go:34
 
-      currentLine = lineNumber
-      startCol = p - lastNewline
-    
+	currentLine = lineNumber
+	startCol = p - lastNewline
+
 		case 2:
-//line ragel/lexer_go.rl:37
+//line ragel/lexer.go:39
 
-      contentStart = p
-    
+	contentStart = p
+
 		case 3:
-//line ragel/lexer_go.rl:41
+//line ragel/lexer.go:43
 
-      docstringContentTypeStart = p
-    
+	docstringContentTypeStart = p
+
 		case 4:
-//line ragel/lexer_go.rl:45
+//line ragel/lexer.go:47
 
-      docstringContentTypeEnd = p
-    
+	docstringContentTypeEnd = p
+
 		case 5:
-//line ragel/lexer_go.rl:49
+//line ragel/lexer.go:51
 
-      rawcon := data[contentStart:nextKeywordStart-1]
+	rawcon := data[contentStart : nextKeywordStart-1]
 
-      con := unindent( startCol, rawcon )
-      con = strings.Replace( con, "\\\"\\\"\\\"", "\"\"\"", -1 )
-      con = strings.TrimLeft( con, " \t\r\n" )
+	con := unindent(startCol, rawcon)
+	con = strings.Replace(con, "\\\"\\\"\\\"", "\"\"\"", -1)
+	con = strings.TrimLeft(con, " \t\r\n")
 
-      conType := string(data[docstringContentTypeStart:docstringContentTypeEnd])
-      conType = strings.TrimSpace( conType )
+	conType := string(data[docstringContentTypeStart:docstringContentTypeEnd])
+	conType = strings.TrimSpace(conType)
 
-      fb.addDocString( currentLine, con, conType )
-    
+	fb.addDocString(currentLine, con, conType)
+
 		case 6:
-//line ragel/lexer_go.rl:62
+//line ragel/lexer.go:64
 
-        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-        name, description := nameAndUnindentedDescription( startCol, kcon );
+	kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+	name, description := nameAndUnindentedDescription(startCol, kcon)
 
-        fb.addFeature( currentLine, name, description )
+	fb.addFeature(currentLine, name, description)
 
-        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-        nextKeywordStart = -1
-    
+	if nextKeywordStart != -1 {
+		p = nextKeywordStart - 1
+	}
+	nextKeywordStart = -1
+
 		case 7:
-//line ragel/lexer_go.rl:72
+//line ragel/lexer.go:76
 
-        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-        name, _ := nameAndUnindentedDescription( startCol, kcon );
+	kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+	name, _ := nameAndUnindentedDescription(startCol, kcon)
 
-        fb.addScenario( currentLine, typeBackground, name )
+	fb.addScenario(currentLine, typeBackground, name)
 
-        // background := Scenario{
-        //     Feature:    &feature,
-        //     Name:       name,
-        //     StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
-        //     Tags:       tags,
-        //     Background: true,
-        //     Steps:      []Step{},
-        //     TableData:  nil,
-        // }
+	if nextKeywordStart != -1 {
+		p = nextKeywordStart - 1
+	}
+	nextKeywordStart = -1
 
-        // lastScenario = &background
-        // tags = tags[:0]
-
-        // if ( examplesTable ) {
-        //     background.TableData = makeTable(currentTable)
-        //     currentTable = currentTable[:0]
-        //     examplesTable = false
-        // }
-
-        // feature.Background = &background
-
-        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-        nextKeywordStart = -1
-    
 		case 8:
-//line ragel/lexer_go.rl:103
+//line ragel/lexer.go:88
 
-        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-        name, _ := nameAndUnindentedDescription( startCol, kcon );
+	kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+	name, _ := nameAndUnindentedDescription(startCol, kcon)
 
-        fb.addScenario( currentLine, typeScenario, name )
+	fb.addScenario(currentLine, typeScenario, name)
 
-        // scenario := Scenario{
-        //     Feature:    &feature,
-        //     Name:       name,
-        //     StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
-        //     Tags:       tags,
-        //     Background: false,
-        //     Steps:      []Step{},
-        //     TableData:  nil,
-        // }
+	if nextKeywordStart != -1 {
+		p = nextKeywordStart - 1
+	}
+	nextKeywordStart = -1
 
-        // lastScenario = &scenario
-        // tags = tags[:0]
-
-        // if ( examplesTable ) {
-        //     scenario.TableData = makeTable(currentTable)
-        //     currentTable = currentTable[:0]
-        //     examplesTable = false
-        // }
-
-        // feature.Scenario = append( feature.Scenario, scenario )
-
-        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-        nextKeywordStart = -1
-    
 		case 9:
-//line ragel/lexer_go.rl:134
+//line ragel/lexer.go:100
 
-        kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-        name, _ := nameAndUnindentedDescription( startCol, kcon );
+	kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
+	name, _ := nameAndUnindentedDescription(startCol, kcon)
 
-        fb.addScenario( currentLine, typeOutline, name )
+	fb.addScenario(currentLine, typeOutline, name)
 
-        // scenario := Scenario{
-        //     Feature:    &feature,
-        //     Name:       name,
-        //     StartsAt:   DocumentLocation{ Filename: filename, Line: currentLine },
-        //     Tags:       tags,
-        //     Background: false,
-        //     Steps:      []Step{},
-        //     TableData:  nil,
-        // }
+	if nextKeywordStart != -1 {
+		p = nextKeywordStart - 1
+	}
+	nextKeywordStart = -1
 
-        // lastScenario = &scenario
-        // tags = tags[:0]
-
-        // if ( examplesTable ) {
-        //     scenario.TableData = makeTable(currentTable)
-        //     currentTable = currentTable[:0]
-        //     examplesTable = false
-        // }
-
-        // feature.Scenario = append( feature.Scenario, scenario )
-
-        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-        nextKeywordStart = -1
-    
 		case 10:
-//line ragel/lexer_go.rl:165
+//line ragel/lexer.go:112
 
-        //kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
-        //name, description := nameAndUnindentedDescription( startCol, kcon );
+	fb.addExamples(currentLine)
 
-        fb.addExamples( currentLine )
+	if nextKeywordStart != -1 {
+		p = nextKeywordStart - 1
+	}
+	nextKeywordStart = -1
 
-        // examplesTable = true;
-
-        if(nextKeywordStart != -1) { p = nextKeywordStart - 1 }
-        nextKeywordStart = -1
-    
 		case 11:
-//line ragel/lexer_go.rl:177
+//line ragel/lexer.go:121
 
-        con := string( data[contentStart:p] )
-        con = strings.TrimSpace( con )
+	con := string(data[contentStart:p])
+	con = strings.TrimSpace(con)
 
-        // step := Step{
-        //     Scenario:     lastScenario,
-        //     Text:         con,
-        //     StartsAt:DocumentLocation{ Filename: filename, Line: currentLine },
-        //     Verb: keyword,
-        //     OriginalVerb: keyword,
-        //     TableData: nil,
-        //     DocString: "",
-        // }
+	fb.addStep(currentLine, keyword, con)
 
-        fb.addStep( currentLine, keyword, con )
-
-        // //fmt.Printf("Before: [%+v]\n", lastScenario.Steps)
-        // lastScenario.Steps = append( lastScenario.Steps, step )
-        //fmt.Printf("After : [%+v]\n", lastScenario.Steps)
-    
 		case 12:
-//line ragel/lexer_go.rl:198
+//line ragel/lexer.go:128
 
-        con := string( data[contentStart:p] )
-        con = strings.TrimSpace( con )
-        // Discard comments
-        // fmt.Printf("Store Thing: [Comment]\nStore Keyword: [%s]\nStore Content: [%s]\n", keyword, con )
-        // listener.comment(substring(data, contentStart, p).trim(), lineNumber);
-        keywordStart = -1
-    
+	con := string(data[contentStart:p])
+	con = strings.TrimSpace(con)
+
+	keywordStart = -1
+
 		case 13:
-//line ragel/lexer_go.rl:207
+//line ragel/lexer.go:135
 
-        con := string( data[contentStart:p] )
-        con = strings.TrimSpace( con )
-        con = strings.TrimLeft( con, "@" ) // Don't need the @
+	con := string(data[contentStart:p])
+	con = strings.TrimSpace(con)
+	con = strings.TrimLeft(con, "@") // Don't need the @
 
-        fb.addTag( currentLine, con )
+	fb.addTag(currentLine, con)
 
-        keywordStart = -1
-    
+	keywordStart = -1
+
 		case 14:
-//line ragel/lexer_go.rl:217
+//line ragel/lexer.go:145
 
-      lineNumber++;
-    
+	lineNumber++
+
 		case 15:
-//line ragel/lexer_go.rl:221
+//line ragel/lexer.go:149
 
-      lastNewline = p + 1
-    
+	lastNewline = p + 1
+
 		case 16:
-//line ragel/lexer_go.rl:225
+//line ragel/lexer.go:153
 
-      if (keywordStart == -1) { keywordStart = p }
-    
+	if keywordStart == -1 {
+		keywordStart = p
+	}
+
 		case 17:
-//line ragel/lexer_go.rl:229
+//line ragel/lexer.go:159
 
-      rawKeyword := string(data[keywordStart:p])
-      rawKeyword = strings.Replace(rawKeyword, ":", "", 1)
-      keyword = rawKeyword[0:]
-      keywordStart = -1
-    
+	rawKeyword := string(data[keywordStart:p])
+	rawKeyword = strings.Replace(rawKeyword, ":", "", 1)
+	keyword = rawKeyword[0:]
+	keywordStart = -1
+
 		case 18:
-//line ragel/lexer_go.rl:236
+//line ragel/lexer.go:166
 
-      nextKeywordStart = p
-    
+	nextKeywordStart = p
+
 		case 19:
-//line ragel/lexer_go.rl:240
+//line ragel/lexer.go:170
 
-      p = p - 1
-      //currentRow = currentRow[:0]
-      currentLine = lineNumber
-    
+	p = p - 1
+	//currentRow = currentRow[:0]
+	currentLine = lineNumber
+
 		case 20:
-//line ragel/lexer_go.rl:246
+//line ragel/lexer.go:176
 
-      contentStart = p;
-    
+	contentStart = p
+
 		case 21:
-//line ragel/lexer_go.rl:250
+//line ragel/lexer.go:180
 
-        con := string(data[contentStart:p])
-        con = strings.TrimSpace(con)
-        con = strings.Replace(con, "\\|", "|", -1)
-        con = strings.Replace(con, "\\n", "\n", -1)
-        con = strings.Replace(con, "\\\\", "\\", -1)
-        fb.addCell( con )
-        // currentRow = append( currentRow, con )
-    
+	con := string(data[contentStart:p])
+	con = strings.TrimSpace(con)
+	con = strings.Replace(con, "\\|", "|", -1)
+	con = strings.Replace(con, "\\n", "\n", -1)
+	con = strings.Replace(con, "\\\\", "\\", -1)
+	fb.addCell(con)
+
 		case 22:
-//line ragel/lexer_go.rl:260
+//line ragel/lexer.go:189
 
-        fb.rowEnd()
-        // currentTable = append( currentTable, currentRow )
-    
+	fb.rowEnd()
+
 		case 23:
-//line ragel/lexer_go.rl:265
+//line ragel/lexer.go:193
 
-      if(cs < lexer_first_final) {
-          content := currentLineContent( data, lastNewline )
-          panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
-      }
-    
-//line gocumber/parser.go:1165
+	if cs < lexer_first_final {
+		content := currentLineContent(data, lastNewline)
+		panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
+	}
+
+//line gocumber/parser.go:1104
 		}
 	}
 
@@ -1181,14 +1120,14 @@ _again:
 			__acts++
 			switch _lexer_actions[__acts-1] {
 			case 23:
-//line ragel/lexer_go.rl:265
+//line ragel/lexer.go:193
 
-      if(cs < lexer_first_final) {
-          content := currentLineContent( data, lastNewline )
-          panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
-      }
-    
-//line gocumber/parser.go:1192
+	if cs < lexer_first_final {
+		content := currentLineContent(data, lastNewline)
+		panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
+	}
+
+//line gocumber/parser.go:1131
 			}
 		}
 	}
@@ -1196,11 +1135,11 @@ _again:
 	_out: {}
 	}
 
-//line ragel/lexer_go.rl:502
-  // END: write init
+//line ragel/lexer.go:441
+// END: write init
 
-    feature = *fb.getFeature()
-    fmt.Printf("Feature: %+v\n", feature.Scenarios)
+	feature = *fb.getFeature()
+	fmt.Printf("Feature: %+v\n", feature.Scenarios)
 
-    return
+	return
 }
