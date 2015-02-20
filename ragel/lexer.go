@@ -5,18 +5,27 @@ import "strings"
 import "regexp"
 import "strconv"
 
-const (
-	typeBackground = iota
-	typeScenario
-	typeOutline
-)
+// HEY THERE! If this file starts with something like "//line ragel/lexer.go:1"
+// then you are editing the generated parser, rather than the input.
 
 // USEFUL URLs:
-//    https://github.com/bnoordhuis/ragel/blob/master/examples/go/url.rl
-//    http://thingsaaronmade.com/blog/a-simple-intro-to-writing-a-lexer-with-ragel.html
-//    https://raw.githubusercontent.com/cucumber/gherkin/master/ragel/lexer.java.rl.erb
-// Search: action ([^ ]+)
-// Replac: action \1
+//    General examples of using Ragel in Go
+//      https://github.com/bnoordhuis/ragel/blob/master/examples/go/url.rl
+//    The Java Ragel file on which this is based
+//      https://raw.githubusercontent.com/cucumber/gherkin/master/ragel/lexer.java.rl.erb
+//
+// Want to gofmt this? You'll need to change the actions in to functions:
+//   Search: action ([^ ]+)
+//   Replac: action \1
+//
+// Generate and run main.go:
+//   ragel -Z -ogocumber/parser.go ragel/lexer.go && gofmt -w=1 gocumber/parser.go && GOPATH="/Users/petersergeant/dev/go" go build main.go && ./main
+
+const (
+    typeBackground = iota
+    typeScenario
+    typeOutline
+)
 
 %%{
   machine lexer;

@@ -7,7 +7,7 @@ Todo:
         + It doesn't add steps properly
             + Hrm, still not working.
         + It doesn't save a step's table properly
-        - makeTable is a no-op
+        + makeTable is a no-op
         - Properly handle exceptions by returning an error
 
     - Add a first text harness for output - scenario_start scenario_done etc
