@@ -5,6 +5,7 @@ import "fmt"
 import "strings"
 import "regexp"
 import "strconv"
+import "errors"
 
 // HEY THERE! If this file starts with something like "//line ragel/lexer.go:1"
 // then you are editing the generated parser, rather than the input.
@@ -22,17 +23,18 @@ import "strconv"
 // Generate and run main.go:
 //   ragel -Z -ogocumber/parser.go ragel/lexer.go && gofmt -w=1 gocumber/parser.go && GOPATH="/Users/petersergeant/dev/go" go build main.go && ./main
 
+// Types of scenario
 const (
 	typeBackground = iota
 	typeScenario
 	typeOutline
 )
 
-//line ragel/lexer.go:210
+//line ragel/lexer.go:214
 
 // START: write data noerror;
 
-//line gocumber/parser.go:39
+//line gocumber/parser.go:42
 var _lexer_actions []byte = []byte{
 	0, 1, 0, 1, 1, 1, 2, 1, 3,
 	1, 4, 1, 5, 1, 6, 1, 7,
@@ -584,7 +586,7 @@ const lexer_first_final int = 292
 
 const lexer_en_main int = 1
 
-//line ragel/lexer.go:214
+//line ragel/lexer.go:218
 
 // END: write data noerror;
 
@@ -594,11 +596,7 @@ func currentLineContent(data []byte, lastNewline int) string {
 }
 
 func unindent(startCol int, text []byte) string {
-	regex, err := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
-
-	if err != nil {
-		panic(err)
-	}
+	regex, _ := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
 	result := regex.ReplaceAll(text, text[:0])
 	return string(result)
 }
@@ -630,13 +628,13 @@ func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, []str
 	}
 }
 
-func makeTable(dl *DocumentLocation, rows [][]string) *TableData {
+func makeTable(dl *DocumentLocation, rows [][]string) (table *TableData, err error) {
 	//fmt.Printf("Incoming: %+v\n", rows )
 
 	columns := rows[0]
 	bodyRows := rows[1:]
 
-	table := &TableData{
+	table = &TableData{
 		StartsAt: *dl,
 		Columns:  columns,
 	}
@@ -654,9 +652,12 @@ func makeTable(dl *DocumentLocation, rows [][]string) *TableData {
 
 	fmt.Printf("Table: %+v\n", table)
 
-	return table
+	return
 }
 
+// In the end, we'll actually have a parser for each language. However, they can
+// all communicate their events to a language-agnostic FeatureBuilder object.
+// This will need hoisting up when we add the second language
 type FeatureBuilder struct {
 	feature       *Feature
 	scenario      *Scenario
@@ -667,6 +668,7 @@ type FeatureBuilder struct {
 	examplesTable *DocumentLocation
 	filename      string
 	lastVerb      string
+	err           error
 }
 
 func (fb *FeatureBuilder) addFeature(currentLine int, name string, cos []string) {
@@ -681,8 +683,19 @@ func (fb *FeatureBuilder) addFeature(currentLine int, name string, cos []string)
 	}
 }
 
+// Features
 func (fb *FeatureBuilder) getFeature() *Feature {
 	return fb.feature
+}
+
+// Errors
+func (fb *FeatureBuilder) throw(errstring string) error {
+	fb.err = errors.New(errstring)
+	return fb.err
+}
+
+func (fb *FeatureBuilder) getError() error {
+	return fb.err
 }
 
 // Tags
@@ -696,6 +709,7 @@ func (fb *FeatureBuilder) getTags() []string {
 	return tags
 }
 
+// Tables
 func (fb *FeatureBuilder) addCell(content string) {
 	fb.row = append(fb.row, content)
 }
@@ -711,11 +725,20 @@ func (fb *FeatureBuilder) getRows() [][]string {
 	return rows
 }
 
-func (fb *FeatureBuilder) addScenario(currentLine int, stype int, name string) {
+// Scenarios
+func (fb *FeatureBuilder) addScenario(currentLine int, stype int, name string) (err error) {
+	if fb.err != nil {
+		err = fb.err
+		return
+	}
+
 	if fb.examplesTable != nil {
 		dl := fb.examplesTable
 		fb.examplesTable = nil
-		fb.step.TableData = makeTable(dl, fb.getRows())
+		fb.step.TableData, err = makeTable(dl, fb.getRows())
+		if err != nil {
+			return
+		}
 	}
 
 	scenario := Scenario{
@@ -739,16 +762,25 @@ func (fb *FeatureBuilder) addScenario(currentLine int, stype int, name string) {
 	}
 
 	fb.lastVerb = ""
+
+	return
 }
 
-func (fb *FeatureBuilder) addStep(currentLine int, verb string, content string) {
-	fmt.Printf("[%d] addStep [%s] [%s]\n", currentLine, verb, content)
+// Steps
+func (fb *FeatureBuilder) addStep(currentLine int, verb string, content string) (err error) {
+	if fb.err != nil {
+		err = fb.err
+		return
+	}
 
 	// Deal with "and" as a verb
 	originalVerb := verb
 	if verb == "And" {
 		if fb.lastVerb == "" {
-			panic("Can't use 'And' as first step of a scenario")
+			err = errors.New((fmt.Sprintf("Can't use '[%s]' as first step of a scenario at line [%d]",
+				verb, currentLine,
+			)))
+			return
 		} else {
 			verb = fb.lastVerb
 		}
@@ -768,8 +800,11 @@ func (fb *FeatureBuilder) addStep(currentLine int, verb string, content string) 
 	fb.scenario.Steps = append(fb.scenario.Steps, step)
 	sref := &fb.scenario.Steps[len(fb.scenario.Steps)-1]
 	fb.step = sref
+
+	return
 }
 
+// DocString
 func (fb *FeatureBuilder) addDocString(currentLine int, docstring string, contentType string) {
 	if len(contentType) < 1 {
 		contentType = "text/plain"
@@ -785,6 +820,7 @@ func (fb *FeatureBuilder) addDocString(currentLine int, docstring string, conten
 
 }
 
+// Examples table
 func (fb *FeatureBuilder) addExamples(currentLine int) {
 	fb.examplesTable = &DocumentLocation{Filename: fb.filename, Line: currentLine}
 }
@@ -818,18 +854,18 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 
 	// START: write init
 
-//line gocumber/parser.go:826
+//line gocumber/parser.go:863
 	{
 		cs = lexer_start
 	}
 
-//line ragel/lexer.go:446
+//line ragel/lexer.go:484
 
 	// END: write init
 
 	// START: write exec
 
-//line gocumber/parser.go:836
+//line gocumber/parser.go:873
 	{
 		var _klen int
 		var _trans int
@@ -909,7 +945,7 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 			_acts++
 			switch _lexer_actions[_acts-1] {
 			case 0:
-//line ragel/lexer.go:34
+//line ragel/lexer.go:37
 				contentStart = p
 				currentLine = lineNumber
 
@@ -918,28 +954,29 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				}
 
 			case 1:
-//line ragel/lexer.go:43
+//line ragel/lexer.go:46
 				currentLine = lineNumber
 				startCol = p - lastNewline
 
 			case 2:
-//line ragel/lexer.go:48
+//line ragel/lexer.go:51
 				contentStart = p
 
 			case 3:
-//line ragel/lexer.go:52
+//line ragel/lexer.go:55
 				docstringContentTypeStart = p
 
 			case 4:
-//line ragel/lexer.go:56
+//line ragel/lexer.go:59
 				docstringContentTypeEnd = p
 
 			case 5:
-//line ragel/lexer.go:60
+//line ragel/lexer.go:63
 				rawcon := data[contentStart : nextKeywordStart-1]
 
 				con := unindent(startCol, rawcon)
 				con = strings.Replace(con, "\\\"\\\"\\\"", "\"\"\"", -1)
+				// TODO: This should really be: s/^[ \t\r]\n//
 				con = strings.TrimLeft(con, " \t\r\n")
 
 				conType := string(data[docstringContentTypeStart:docstringContentTypeEnd])
@@ -948,7 +985,7 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				fb.addDocString(currentLine, con, conType)
 
 			case 6:
-//line ragel/lexer.go:73
+//line ragel/lexer.go:77
 				kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
 				name, description := nameAndUnindentedDescription(startCol, kcon)
 
@@ -960,7 +997,7 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				nextKeywordStart = -1
 
 			case 7:
-//line ragel/lexer.go:85
+//line ragel/lexer.go:89
 				kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
 				name, _ := nameAndUnindentedDescription(startCol, kcon)
 
@@ -972,7 +1009,7 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				nextKeywordStart = -1
 
 			case 8:
-//line ragel/lexer.go:97
+//line ragel/lexer.go:101
 				kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
 				name, _ := nameAndUnindentedDescription(startCol, kcon)
 
@@ -984,7 +1021,7 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				nextKeywordStart = -1
 
 			case 9:
-//line ragel/lexer.go:109
+//line ragel/lexer.go:113
 				kcon := keywordContent(data, p, eof, nextKeywordStart, contentStart)
 				name, _ := nameAndUnindentedDescription(startCol, kcon)
 
@@ -996,7 +1033,7 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				nextKeywordStart = -1
 
 			case 10:
-//line ragel/lexer.go:121
+//line ragel/lexer.go:125
 				fb.addExamples(currentLine)
 
 				if nextKeywordStart != -1 {
@@ -1005,21 +1042,21 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				nextKeywordStart = -1
 
 			case 11:
-//line ragel/lexer.go:130
+//line ragel/lexer.go:134
 				con := string(data[contentStart:p])
 				con = strings.TrimSpace(con)
 
 				fb.addStep(currentLine, keyword, con)
 
 			case 12:
-//line ragel/lexer.go:137
+//line ragel/lexer.go:141
 				con := string(data[contentStart:p])
 				con = strings.TrimSpace(con)
 
 				keywordStart = -1
 
 			case 13:
-//line ragel/lexer.go:144
+//line ragel/lexer.go:148
 				con := string(data[contentStart:p])
 				con = strings.TrimSpace(con)
 				con = strings.TrimLeft(con, "@") // Don't need the @
@@ -1029,42 +1066,42 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				keywordStart = -1
 
 			case 14:
-//line ragel/lexer.go:154
+//line ragel/lexer.go:158
 				lineNumber++
 
 			case 15:
-//line ragel/lexer.go:158
+//line ragel/lexer.go:162
 				lastNewline = p + 1
 
 			case 16:
-//line ragel/lexer.go:162
+//line ragel/lexer.go:166
 				if keywordStart == -1 {
 					keywordStart = p
 				}
 
 			case 17:
-//line ragel/lexer.go:168
+//line ragel/lexer.go:172
 				rawKeyword := string(data[keywordStart:p])
 				rawKeyword = strings.Replace(rawKeyword, ":", "", 1)
 				keyword = rawKeyword[0:]
 				keywordStart = -1
 
 			case 18:
-//line ragel/lexer.go:175
+//line ragel/lexer.go:179
 				nextKeywordStart = p
 
 			case 19:
-//line ragel/lexer.go:179
+//line ragel/lexer.go:183
 				p = p - 1
 				//currentRow = currentRow[:0]
 				currentLine = lineNumber
 
 			case 20:
-//line ragel/lexer.go:185
+//line ragel/lexer.go:189
 				contentStart = p
 
 			case 21:
-//line ragel/lexer.go:189
+//line ragel/lexer.go:193
 				con := string(data[contentStart:p])
 				con = strings.TrimSpace(con)
 				con = strings.Replace(con, "\\|", "|", -1)
@@ -1073,17 +1110,17 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				fb.addCell(con)
 
 			case 22:
-//line ragel/lexer.go:198
+//line ragel/lexer.go:202
 				fb.rowEnd()
 
 			case 23:
-//line ragel/lexer.go:202
+//line ragel/lexer.go:206
 				if cs < lexer_first_final {
 					content := currentLineContent(data, lastNewline)
-					panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
+					fb.throw(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
 				}
 
-//line gocumber/parser.go:1113
+//line gocumber/parser.go:1151
 			}
 		}
 
@@ -1106,13 +1143,13 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 				__acts++
 				switch _lexer_actions[__acts-1] {
 				case 23:
-//line ragel/lexer.go:202
+//line ragel/lexer.go:206
 					if cs < lexer_first_final {
 						content := currentLineContent(data, lastNewline)
-						panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
+						fb.throw(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
 					}
 
-//line gocumber/parser.go:1140
+//line gocumber/parser.go:1178
 				}
 			}
 		}
@@ -1122,12 +1159,15 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 		}
 	}
 
-//line ragel/lexer.go:450
+//line ragel/lexer.go:488
 
 	// END: write init
 
-	feature = *fb.getFeature()
-	fmt.Printf("Feature: %+v\n", feature.Scenarios)
+	if fb.getError() != nil {
+		err = fb.getError()
+	} else {
+		feature = *fb.getFeature()
+	}
 
 	return
 }

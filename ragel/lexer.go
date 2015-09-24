@@ -4,6 +4,7 @@ import "fmt"
 import "strings"
 import "regexp"
 import "strconv"
+import "errors"
 
 // HEY THERE! If this file starts with something like "//line ragel/lexer.go:1"
 // then you are editing the generated parser, rather than the input.
@@ -21,6 +22,8 @@ import "strconv"
 // Generate and run main.go:
 //   ragel -Z -ogocumber/parser.go ragel/lexer.go && gofmt -w=1 gocumber/parser.go && GOPATH="/Users/petersergeant/dev/go" go build main.go && ./main
 
+
+// Types of scenario
 const (
     typeBackground = iota
     typeScenario
@@ -62,7 +65,8 @@ action store_docstring_content {
 
 	con := unindent(startCol, rawcon)
 	con = strings.Replace(con, "\\\"\\\"\\\"", "\"\"\"", -1)
-	con = strings.TrimLeft(con, " \t\r\n")
+	// TODO: This should really be: s/^[ \t\r]\n//
+    con = strings.TrimLeft(con, " \t\r\n")
 
 	conType := string(data[docstringContentTypeStart:docstringContentTypeEnd])
 	conType = strings.TrimSpace(conType)
@@ -202,7 +206,7 @@ action store_row {
 action end_feature {
 	if cs < lexer_first_final {
 		content := currentLineContent(data, lastNewline)
-		panic(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
+		fb.throw(fmt.Sprintf("Lexing error on line %d: '%s'. See http://wiki.github.com/cucumber/gherkin/lexingerror for more information.", lineNumber, content))
 	}
 }
 
@@ -219,11 +223,7 @@ func currentLineContent(data []byte, lastNewline int) string {
 }
 
 func unindent(startCol int, text []byte) string {
-	regex, err := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
-
-	if err != nil {
-		panic(err)
-	}
+	regex, _ := regexp.Compile("(?m)^[\t ]{0," + strconv.Itoa(startCol) + "}")
 	result := regex.ReplaceAll(text, text[:0])
 	return string(result)
 }
@@ -255,13 +255,13 @@ func nameAndUnindentedDescription(startCol int, textBytes []byte) (string, []str
 	}
 }
 
-func makeTable(dl *DocumentLocation, rows [][]string) *TableData {
+func makeTable(dl *DocumentLocation, rows [][]string) (table *TableData, err error) {
 	//fmt.Printf("Incoming: %+v\n", rows )
 
 	columns := rows[0]
 	bodyRows := rows[1:]
 
-	table := &TableData{
+	table = &TableData{
 		StartsAt: *dl,
 		Columns:  columns,
 	}
@@ -279,9 +279,12 @@ func makeTable(dl *DocumentLocation, rows [][]string) *TableData {
 
 	fmt.Printf("Table: %+v\n", table)
 
-	return table
+	return
 }
 
+// In the end, we'll actually have a parser for each language. However, they can
+// all communicate their events to a language-agnostic FeatureBuilder object.
+// This will need hoisting up when we add the second language
 type FeatureBuilder struct {
 	feature       *Feature
 	scenario      *Scenario
@@ -292,6 +295,7 @@ type FeatureBuilder struct {
 	examplesTable *DocumentLocation
 	filename      string
 	lastVerb      string
+    err error
 }
 
 func (fb *FeatureBuilder) addFeature(currentLine int, name string, cos []string) {
@@ -306,8 +310,19 @@ func (fb *FeatureBuilder) addFeature(currentLine int, name string, cos []string)
 	}
 }
 
+// Features
 func (fb *FeatureBuilder) getFeature() *Feature {
 	return fb.feature
+}
+
+// Errors
+func (fb *FeatureBuilder) throw(errstring string) error {
+    fb.err = errors.New(errstring)
+    return fb.err
+}
+
+func (fb *FeatureBuilder) getError() error {
+    return fb.err
 }
 
 // Tags
@@ -321,6 +336,7 @@ func (fb *FeatureBuilder) getTags() []string {
 	return tags
 }
 
+// Tables
 func (fb *FeatureBuilder) addCell(content string) {
 	fb.row = append(fb.row, content)
 }
@@ -336,11 +352,20 @@ func (fb *FeatureBuilder) getRows() [][]string {
 	return rows
 }
 
-func (fb *FeatureBuilder) addScenario(currentLine int, stype int, name string) {
+// Scenarios
+func (fb *FeatureBuilder) addScenario(currentLine int, stype int, name string) (err error) {
+    if ( fb.err != nil ) {
+        err = fb.err
+        return
+    }
+
 	if fb.examplesTable != nil {
 		dl := fb.examplesTable
 		fb.examplesTable = nil
-		fb.step.TableData = makeTable(dl, fb.getRows())
+		fb.step.TableData, err = makeTable(dl, fb.getRows())
+        if ( err != nil ) {
+            return
+        }
 	}
 
 	scenario := Scenario{
@@ -364,16 +389,25 @@ func (fb *FeatureBuilder) addScenario(currentLine int, stype int, name string) {
 	}
 
 	fb.lastVerb = ""
+
+    return
 }
 
-func (fb *FeatureBuilder) addStep(currentLine int, verb string, content string) {
-	fmt.Printf("[%d] addStep [%s] [%s]\n", currentLine, verb, content)
+// Steps
+func (fb *FeatureBuilder) addStep(currentLine int, verb string, content string) (err error) {
+    if ( fb.err != nil ) {
+        err = fb.err
+        return
+    }
 
 	// Deal with "and" as a verb
 	originalVerb := verb
 	if verb == "And" {
 		if fb.lastVerb == "" {
-			panic("Can't use 'And' as first step of a scenario")
+			err = errors.New( ( fmt.Sprintf("Can't use '[%s]' as first step of a scenario at line [%d]",
+                verb, currentLine,
+            )))
+            return
 		} else {
 			verb = fb.lastVerb
 		}
@@ -393,8 +427,11 @@ func (fb *FeatureBuilder) addStep(currentLine int, verb string, content string) 
 	fb.scenario.Steps = append(fb.scenario.Steps, step)
 	sref := &fb.scenario.Steps[len(fb.scenario.Steps)-1]
 	fb.step = sref
+
+    return
 }
 
+// DocString
 func (fb *FeatureBuilder) addDocString(currentLine int, docstring string, contentType string) {
 	if len(contentType) < 1 {
 		contentType = "text/plain"
@@ -410,6 +447,7 @@ func (fb *FeatureBuilder) addDocString(currentLine int, docstring string, conten
 
 }
 
+// Examples table
 func (fb *FeatureBuilder) addExamples(currentLine int) {
 	fb.examplesTable = &DocumentLocation{Filename: fb.filename, Line: currentLine}
 }
@@ -449,8 +487,11 @@ func ParseFeature(data []byte, filename string) (feature Feature, err error) {
 	%% write exec;
 // END: write init
 
-	feature = *fb.getFeature()
-	fmt.Printf("Feature: %+v\n", feature.Scenarios)
+    if ( fb.getError() != nil ) {
+        err = fb.getError()
+    } else {
+	   feature = *fb.getFeature()
+    }
 
 	return
 }
